@@ -29,5 +29,10 @@ FIRMWARE_NAMES = {
     SupportedDevices.DEV_90: '6_07f_Lenovo.xpfwext',
     SupportedDevices.DEV_97: '6_07f_lenovo_mis_qm.xpfwext',
     SupportedDevices.DEV_9a: '6_07f_lenovo_mis_qm.xpfwext',
-    SupportedDevices.DEV_9d: '6_07f_lenovo_mis_qm.xpfwext'
+    SupportedDevices.DEV_9d: '6_07f_lenovo_mis_qm.xpfwext',
+    # 0xd51-sensor variants ship with firmware pre-loaded; xpfwext upload is
+    # only needed for factory-reset / unprovisioned chips. The HP softpaq
+    # filename matches what extracted from HP's Windows driver (sp135736.exe).
+    SupportedDevices.DEV_AB: '6_07f_hp_cmit_mis_qm.xpfwext',  # HP EliteBook 840 G5
+    SupportedDevices.DEV_B7: '6_07f_hp_cmit_mis_qm.xpfwext',  # HP G6 series (same chip family)
 }

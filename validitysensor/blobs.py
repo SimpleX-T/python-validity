@@ -8,9 +8,13 @@ def __load_blob(blob: str) -> bytes:
             from . import blobs_97 as blobs
         elif usb.usb_dev().idProduct == 0x009d:
             from . import blobs_9d as blobs
+        elif usb.usb_dev().idProduct == 0x00ab:
+            from . import blobs_97 as blobs   # HP EliteBook 840 G5; verified
     elif usb.usb_dev().idVendor == 0x06cb:
         if usb.usb_dev().idProduct == 0x009a:
             from . import blobs_9a as blobs
+        elif usb.usb_dev().idProduct == 0x00b7:
+            from . import blobs_9a as blobs   # HP G6 series; same sensor type as 0x00ab
 
     globals()[blob] = getattr(blobs, blob)
     return globals()[blob]

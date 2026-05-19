@@ -24,7 +24,8 @@ from .util import assert_status, unhex
 calib_data_path = PYTHON_VALIDITY_DATA_DIR + 'calib-data.bin'
 
 line_update_type1_devices = [
-    0xB5, 0x885, 0xB3, 0x143B, 0x1055, 0xE1, 0x8B1, 0xEA, 0xE4, 0xED, 0x1825, 0x1FF5, 0x199
+    0xB5, 0x885, 0xB3, 0x143B, 0x1055, 0xE1, 0x8B1, 0xEA, 0xE4, 0xED, 0x1825, 0x1FF5, 0x199,
+    0xD51,  # HP EliteBook 840 G5 (138a:00ab) / HP G6 series (06cb:00b7)
 ]
 
 
@@ -224,6 +225,17 @@ class Sensor:
 
     def open(self):
         self.device_info = identify_sensor()
+        self.real_device_type = self.device_info.type
+
+        # Sensor type 0xd51 (HP EliteBook 840 G5 138a:00ab, HP G6 series 06cb:00b7)
+        # has no native SensorTypeInfo / SensorCaptureProg entry. Empirically the
+        # 0x199 profile produces images that the on-chip matcher accepts after
+        # enrollment/verify; the 0xdb profile does not. Spoofing keeps the rest
+        # of this method (calibration switch, capture program lookup) on a code
+        # path that works.
+        if self.device_info.type == 0xd51:
+            logging.info('Sensor type 0xd51 — aliasing to 0x199 profile')
+            self.device_info.type = 0x199
 
         logging.info('Opening sensor: %s' % self.device_info.name)
         self.type_info = SensorTypeInfo.get_by_type(self.device_info.type)
@@ -702,14 +714,23 @@ class Sensor:
                 raise Exception('wait_start: Unexpected interrupt type %s' % hexlify(b).decode())
 
             # wait for finger
+            # Sensor type 0xd51 (138a:00ab, 06cb:00b7) does not emit the
+            # b[0]=2 "finger detected" interrupt — it jumps directly from the
+            # start ack to b[0]=3 capture events. Accept b[0]=3 as a substitute
+            # and pass the interrupt through to the wait-capture-complete loop.
+            saved_b = None
             while True:
                 b = usb.wait_int()
                 if b[0] == 2:
                     break
+                if b[0] == 3 and getattr(self, 'real_device_type', None) == 0xd51:
+                    saved_b = b
+                    break
 
             # wait capture complete
             while True:
-                b = usb.wait_int()
+                b = saved_b if saved_b is not None else usb.wait_int()
+                saved_b = None
                 if b[0] != 3:
                     raise Exception('Unexpected interrupt type %s' % hexlify(b).decode())
 
