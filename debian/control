@@ -19,6 +19,7 @@ Depends: ${python3:Depends},
  dbus,
  open-fprintd (>= 0.6~),
  innoextract (>= 1.6~)
+Recommends: libpam-fprintd, cabextract
 Description: Validity Fingerprint Sensor DBus Driver
  This package adds support to some Validity sensors.
  .

@@ -1,3 +1,41 @@
+python-validity (0.16~hp3) noble; urgency=medium
+
+  * sensor.enroll: replace existing finger record when re-enrolling the same
+    subtype for the same user. Without this, the chip's db rejects creating
+    a duplicate, surfacing as enroll-failed at the final stage after all
+    captures pass. The delete is performed inside do_create_finger (right
+    before db.new_finger) so the chip's enroll session isn't disrupted —
+    pre-deleting before EnrollStart caused subsequent captures to return
+    retry-scan indefinitely until the daemon was restarted.
+
+ -- SimpleX-T <ntmark2004@gmail.com>  Thu, 21 May 2026 23:00:00 +0100
+
+python-validity (0.16~hp2) noble; urgency=medium
+
+  * validity-sensors-firmware: fall back to cabextract when innoextract
+    cannot handle the archive. HP softpaqs (e.g. sp135736.exe used for
+    138a:00ab and 06cb:00b7) are CAB-wrapped self-extracting exes, not
+    Inno Setup installers, so innoextract rejected them and the postinst
+    surfaced a noisy Python traceback. With the fallback, HP softpaq
+    extraction now works, and either extractor satisfies the runtime
+    requirement.
+  * Recommends: cabextract (so the fallback path is available by default).
+
+ -- SimpleX-T <ntmark2004@gmail.com>  Thu, 21 May 2026 11:00:00 +0100
+
+python-validity (0.16~hp1) noble; urgency=medium
+
+  * Add support for sensor type 0xd51 (138a:00ab, 06cb:00b7) — HP EliteBook
+    840 G5 and related models. Fixes a chip-specific interrupt protocol
+    that caused fprintd-verify to hang forever on these devices.
+  * Add FIRMWARE_URIS entries for DEV_AB and DEV_B7 so that
+    validity-sensors-firmware no longer crashes with KeyError on these PIDs.
+  * Enable libpam-fprintd via pam-auth-update in postinst so that sudo /
+    screen-unlock prompt for fingerprint immediately after install.
+  * Recommend libpam-fprintd.
+
+ -- SimpleX-T <ntmark2004@gmail.com>  Wed, 20 May 2026 22:25:34 +0100
+
 python-validity (0.15~ppa2) noble; urgency=medium
 
   * Change all write paths to /var/run/python-validity

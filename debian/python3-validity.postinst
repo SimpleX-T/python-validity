@@ -8,5 +8,8 @@ if [ "$1" = "configure" ]; then
     systemctl daemon-reload || true
     udevadm control --reload-rules || true
     udevadm trigger || true
+    if [ -x /usr/sbin/pam-auth-update ]; then
+        pam-auth-update --package --enable fprintd || true
+    fi
 fi
 
