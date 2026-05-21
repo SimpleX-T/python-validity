@@ -59,10 +59,23 @@ def download_and_extract_fw(dev_type, fwdir, fwuri=None):
         raise Exception('Hash mismatch for driver download! Expected {}, got {}'.format(
             expected_hash, actual_hash))
 
-    subprocess.check_call([
-        'innoextract', '--output-dir', fwdir, '--include', fwname, '--collisions', 'overwrite',
-        fwarchive
-    ])
+    # Lenovo softpaqs are Inno Setup installers; HP softpaqs are CAB-wrapped
+    # self-extracting exes. Try innoextract first, fall back to cabextract.
+    try:
+        subprocess.check_call([
+            'innoextract', '--output-dir', fwdir, '--include', fwname,
+            '--collisions', 'overwrite', fwarchive
+        ], stderr=subprocess.DEVNULL)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        try:
+            # No -F filter: HP softpaqs nest the target under e.g. src/driver/INF/x64/,
+            # and cabextract -F matches the full path. Extract everything; the find
+            # call below locates the target file regardless of subdirectory.
+            subprocess.check_call(['cabextract', '-q', '-d', fwdir, fwarchive])
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            raise Exception(
+                'Failed to extract {} from {}: neither innoextract nor cabextract '
+                'could handle the archive ({}).'.format(fwname, fwarchive, e))
 
     fwpath = subprocess.check_output(['find', fwdir, '-name', fwname]).decode('utf-8').strip()
     print('Found firmware at {}'.format(fwpath))
@@ -91,10 +104,16 @@ if __name__ == "__main__":
     if not dev_type:
         raise Exception('No supported validity device found')
 
-    try:
-        subprocess.check_call(['innoextract', '--version'], stdout=subprocess.DEVNULL)
-    except Exception as e:
-        print('Impossible to run innoextract: {}'.format(e))
+    have_extractor = False
+    for tool in ('innoextract', 'cabextract'):
+        try:
+            subprocess.check_call([tool, '--version'], stdout=subprocess.DEVNULL)
+            have_extractor = True
+            break
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            continue
+    if not have_extractor:
+        print('Need at least one of innoextract or cabextract installed.')
         sys.exit(1)
 
     with tempfile.TemporaryDirectory() as fwdir:
