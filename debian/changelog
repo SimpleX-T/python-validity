@@ -1,3 +1,15 @@
+python-validity (0.16~hp4) noble; urgency=medium
+
+  * VerifyStart: emit verify-retry-scan at most once per verify cycle so
+    pam_fprintd doesn't repeat "Place your finger on the reader" for every
+    one of the chip's chatty capture-quality retries. On the 0xd51 chip the
+    capture loop fires the signal 20+ times during a 10s timeout window,
+    which flooded the terminal during sudo. Enrollment is unchanged —
+    per-stage retry-scans there are useful because each stage is a discrete
+    user action.
+
+ -- SimpleX-T <ntmark2004@gmail.com>  Thu, 21 May 2026 23:30:00 +0100
+
 python-validity (0.16~hp3) noble; urgency=medium
 
   * sensor.enroll: replace existing finger record when re-enrolling the same

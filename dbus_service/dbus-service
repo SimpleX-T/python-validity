@@ -114,8 +114,19 @@ class Device(dbus.service.Object):
 
         self.VerifyFingerSelected('any')
 
+        # pam_fprintd re-prints "Place your finger on the reader" for every
+        # verify-retry-scan signal, which on this chip's chatty capture loop
+        # can fire 30+ times per verify cycle and floods the terminal during
+        # sudo. Emit it at most once per VerifyStart so the user gets one
+        # initial prompt + one early retry hint, then silence until match
+        # or timeout. Enroll keeps its per-stage signals — those are useful
+        # because each stage is a discrete user action.
+        retry_emitted = [False]
+
         def update_cb(e):
-            self.VerifyStatus('verify-retry-scan', False)
+            if not retry_emitted[0]:
+                self.VerifyStatus('verify-retry-scan', False)
+                retry_emitted[0] = True
 
         def run():
             try:
