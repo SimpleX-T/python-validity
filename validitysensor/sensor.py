@@ -832,11 +832,20 @@ class Sensor:
         def do_create_finger(final_template: bytes, tid: bytes):
             tinfo = self.make_finger_data(subtype, final_template, tid)
 
-            usr = db.lookup_user(identity)
-            if usr is None:
+            existing = db.lookup_user(identity)
+            if existing is None:
                 usr = db.new_user(identity)
             else:
-                usr = usr.dbid
+                # Replace any existing enrollment for this finger slot. The chip
+                # rejects creating a second record with the same subtype for the
+                # same user. Deleting here (after all captures are done) keeps
+                # the chip's enroll session uninterrupted — earlier attempts to
+                # pre-delete before EnrollStart left the chip in a state where
+                # subsequent captures kept returning retry-scan indefinitely.
+                for f in existing.fingers:
+                    if f['subtype'] == subtype:
+                        db.del_record(f['dbid'])
+                usr = existing.dbid
 
             recid = db.new_finger(usr, tinfo)
             usb.wait_int()
