@@ -266,6 +266,21 @@ class Sensor:
         self.lines_per_frame = lines_2d * self.type_info.repeat_multiplier
         self.bytes_per_line = self.type_info.bytes_per_line
 
+        # Diagnostic (task #17): log resolved capture geometry so we can
+        # tell whether the 0x199-spoofed profile matches what the 0xd51
+        # chip actually expects. lines_2d is extracted from the capture
+        # program's 0x2f chunk; if the chip is producing a different
+        # frame size, this is where the mismatch first shows up.
+        logging.info(
+            'Capture geometry: real_type=0x%x spoofed_type=0x%x '
+            'lines_2d=%d repeat_multiplier=%d lines_per_frame=%d '
+            'bytes_per_line=0x%x line_width=%d '
+            'lines_per_calibration_data=%d',
+            self.real_device_type, self.device_info.type, lines_2d,
+            self.type_info.repeat_multiplier, self.lines_per_frame,
+            self.bytes_per_line, self.type_info.line_width,
+            self.type_info.lines_per_calibration_data)
+
         factory_bits = get_factory_bits(0x0e00)
         self.factory_calibration_values = factory_bits[3][4:]
 

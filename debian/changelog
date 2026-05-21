@@ -1,3 +1,19 @@
+python-validity (0.16~hp6) noble; urgency=medium
+
+  * Diagnostic logging (no behavior change):
+    - sensor.py: log resolved capture geometry once at chip open
+      (real_type, spoofed_type, lines_per_frame, bytes_per_line,
+      line_width, calibration data lines). Makes future "is the
+      spoofed-to-0x199 profile right for this chip?" questions
+      answerable from journal alone.
+    - dbus-service: log every internal chip retry-scan during
+      VerifyStart, independent of the D-Bus signal throttle.
+      Lets users / support tickets quantify capture quality.
+  * Both changes are INFO-level log lines only. ~1 log per chip
+    open + ~0-3 lines per verify in normal use.
+
+ -- SimpleX-T <ntmark2004@gmail.com>  Thu, 21 May 2026 23:55:00 +0100
+
 python-validity (0.16~hp5) noble; urgency=medium
 
   * debian/source/options: tar-ignore .pybuild, build, *.egg-info,

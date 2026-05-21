@@ -122,8 +122,16 @@ class Device(dbus.service.Object):
         # or timeout. Enroll keeps its per-stage signals — those are useful
         # because each stage is a discrete user action.
         retry_emitted = [False]
+        retry_count = [0]
 
         def update_cb(e):
+            # Always log every chip retry to journal — useful for the
+            # task #17 capture-quality benchmark. The D-Bus emit below
+            # is still throttled to once per cycle (avoids spamming
+            # pam_fprintd which re-prints the prompt on each signal).
+            retry_count[0] += 1
+            logging.info('Chip capture retry-scan #%d (user=%s)',
+                         retry_count[0], user)
             if not retry_emitted[0]:
                 self.VerifyStatus('verify-retry-scan', False)
                 retry_emitted[0] = True
