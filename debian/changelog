@@ -1,3 +1,15 @@
+python-validity (0.16~hp5) noble; urgency=medium
+
+  * debian/source/options: tar-ignore .pybuild, build, *.egg-info,
+    __pycache__, *.pyc. Without this, dpkg-source for 3.0 (native)
+    packages bundles leftover local build artifacts (cached pybuild
+    state with absolute paths from the developer's machine) into the
+    source tarball, which caused per-series Launchpad builds after
+    the first one to fail with "Permission denied" trying to write
+    into a baked-in /home/<dev>/... path.
+
+ -- SimpleX-T <ntmark2004@gmail.com>  Thu, 21 May 2026 13:30:00 +0100
+
 python-validity (0.16~hp4) noble; urgency=medium
 
   * VerifyStart: emit verify-retry-scan at most once per verify cycle so
