@@ -1,5 +1,6 @@
 import errno
 import logging
+import time
 import typing
 from binascii import hexlify, unhexlify
 from enum import Enum
@@ -62,6 +63,34 @@ class Usb:
     def open_dev(self, dev: ucore.Device):
         if dev is None:
             raise Exception('No matching devices found')
+
+        # Defensive USB reset on init.
+        #
+        # The 0xd51-family chips (HP 138a:00ab / 06cb:00b7) can be left in
+        # a "stuck" protocol state across a previous unclean exit of this
+        # daemon, a cold boot, or a sudden suspend/resume. In that state
+        # the chip accepts the bulk-OUT but never replies on bulk-IN, so
+        # the very first cleartext command (typically `cmd 3e`
+        # get_flash_info) times out — the daemon then restart-loops at
+        # 15s intervals and the sensor is "vanished" until a manual USB
+        # reset. This block is the in-driver equivalent of the manual
+        # `udevadm trigger --attr-match=idVendor=... --attr-match=idProduct=...`
+        # workaround users have been running to recover.
+        #
+        # Reported by Killersparrow1 (#238, Fedora 44, vanishes on reboot)
+        # and Maarten (Arch, ZBook G5, USBTimeoutError on first 3e). Also
+        # observed locally on the maintainer's machine (sensor prompts but
+        # doesn't detect after a while).
+        try:
+            vid, pid = dev.idVendor, dev.idProduct
+            dev.reset()
+            time.sleep(0.5)
+            # USB address may shift after reset; re-find by vid/pid.
+            dev = ucore.find(idVendor=vid, idProduct=pid)
+            if dev is None:
+                raise Exception('Device disappeared after USB reset')
+        except USBError as e:
+            logging.warning('open_dev: USB reset failed (often non-fatal): %s', e)
 
         self.dev = dev
         self.dev.default_timeout = 15000

@@ -1,3 +1,24 @@
+python-validity (0.16~hp7) noble; urgency=medium
+
+  * usb.py: defensive USB reset at the start of open_dev(). The 0xd51-
+    family chips (138a:00ab, 06cb:00b7) can be left in a "stuck"
+    protocol state across cold boot, unclean exit of the daemon, or
+    sudden suspend/resume — in that state the chip accepts the
+    bulk-OUT but never replies on bulk-IN, so the first cleartext
+    command (get_flash_info, cmd 3e) times out and the daemon enters
+    a 15-second restart loop. The reset is the in-driver equivalent
+    of the manual `udevadm trigger --attr-match=idVendor=...
+    --attr-match=idProduct=...` workaround multiple users were
+    running to recover after every reboot. Reported by Killersparrow1
+    (uunicorn/python-validity#238, Fedora 44, sensor vanishes on
+    reboot) and a separate Arch / ZBook G5 user (USBTimeoutError on
+    cmd 3e). Also observed intermittently on the maintainer's
+    machine.
+  * After reset, re-find the device by vid/pid because the USB
+    address can shift across the reset.
+
+ -- SimpleX-T <ntmark2004@gmail.com>  Sun, 25 May 2026 00:30:00 +0100
+
 python-validity (0.16~hp6) noble; urgency=medium
 
   * Diagnostic logging (no behavior change):
