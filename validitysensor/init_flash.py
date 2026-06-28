@@ -195,6 +195,14 @@ def _repair_cert_store():
         signature = partition_signature_0090
 
     try:
+        if is_b7:
+            usb.cmd(bytes.fromhex('085c2000800700000004'))
+            usb.cmd(bytes.fromhex('078020008004'))
+            rb = reset_blob() if callable(reset_blob) else reset_blob
+            prefix = b'\x06\x02\x00\x00\x01'
+            if rb[:5] != prefix:
+                rb = prefix + rb
+            usb.cmd(rb)
         partition_flash(info, layout, signature, client_public)
     except Exception as exc:
         raise Exception(
@@ -247,10 +255,16 @@ def init_flash():
     else:
         logging.info('Flash was not initialized yet. Formatting...')
 
-    # Skip reset command on 0xd51 sensor type (06cb:00b7)
-    # as it is not supported and throws 0x0404.
     is_b7 = (usb.usb_dev().idVendor == 0x06cb and usb.usb_dev().idProduct == 0x00b7)
-    if not is_b7:
+    if is_b7:
+        assert_status(usb.cmd(bytes.fromhex('085c2000800700000004')))
+        assert_status(usb.cmd(bytes.fromhex('078020008004')))
+        rb = reset_blob() if callable(reset_blob) else reset_blob
+        prefix = b'\x06\x02\x00\x00\x01'
+        if rb[:5] != prefix:
+            rb = prefix + rb
+        assert_status(usb.cmd(rb))
+    else:
         assert_status(usb.cmd(reset_blob))
 
     skey = ec.generate_private_key(ec.SECP256R1(), crypto_backend)
