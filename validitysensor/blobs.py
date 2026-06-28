@@ -14,7 +14,7 @@ def __load_blob(blob: str) -> bytes:
         if usb.usb_dev().idProduct == 0x009a:
             from . import blobs_9a as blobs
         elif usb.usb_dev().idProduct == 0x00b7:
-            from . import blobs_9a as blobs   # HP G6 series; same sensor type as 0x00ab
+            from . import blobs_b7 as blobs   # HP G6 series; same sensor type as 0x00ab
 
     globals()[blob] = getattr(blobs, blob)
     return globals()[blob]

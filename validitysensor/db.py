@@ -40,7 +40,7 @@ def subtype_to_string(s: int):
 def parse_user_storage(rsp: bytes):
     rc, = unpack('<H', rsp[:2])
 
-    if rc == 0x04b3:
+    if rc in (0x04b3, 0x04b4):  # 0x04b3 = not found, 0x04b4 = blank/uninitialized DB
         return None
 
     assert_status(rsp[:2])
@@ -166,7 +166,7 @@ class Db:
         rsp = tls.cmd(pack('<BHHH', 0x4a, 0, stg.dbid, len(data)) + data)
         rc, = unpack('<H', rsp[:2])
 
-        if rc == 0x04b3:
+        if rc in (0x04b3, 0x04b4):  # 0x04b4 = blank DB on fresh sensor
             return None
         else:
             return parse_user(rsp)
@@ -200,6 +200,9 @@ class Db:
 
     def db_info(self):
         rsp = tls.cmd(b'\x45')
+        rc, = unpack('<H', rsp[:2])
+        if rc == 0x04b4:  # DB partition uninitialized on fresh sensor -- not an error
+            return None
         assert_status(rsp)
         rsp = rsp[2:]
 
@@ -211,7 +214,7 @@ class Db:
         return Db.Info(total, used, free, records, roots)
 
     def new_record(self, parent: int, typ: int, storage: int, data: bytes):
-        self.db_info()  # TODO check free space, compact the partition when out of storage
+        self.db_info()  # TODO check free space, compact the partition when out of storage (returns None on blank DB)
         assert_status(tls.cmd(db_write_enable))
         try:
             rsp = tls.cmd(pack('<BHHHH', 0x47, parent, typ, storage, len(data)) + data)
