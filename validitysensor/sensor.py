@@ -23,6 +23,15 @@ from .util import assert_status, unhex
 # TODO: this should be specific to an individual device (system may have more than one sensor)
 calib_data_path = PYTHON_VALIDITY_DATA_DIR + 'calib-data.bin'
 
+
+class FingerNotMatchedException(Exception):
+    """Chip scanned successfully but found no matching enrolled template.
+
+    Distinct from generic scan/capture errors so callers can emit
+    verify-no-match immediately rather than retrying the capture loop.
+    """
+
+
 line_update_type1_devices = [
     0xB5, 0x885, 0xB3, 0x143B, 0x1055, 0xE1, 0x8B1, 0xEA, 0xE4, 0xED, 0x1825, 0x1FF5, 0x199,
     0xD51,  # HP EliteBook 840 G5 (138a:00ab) / HP G6 series (06cb:00b7)
@@ -773,6 +782,8 @@ class Sensor:
         finally:
             tls.app(unhexlify('04'))  # capture stop if still running, cleanup
 
+
+
     def enrollment_update_start(self, key: int) -> int:
         rsp = tls.app(pack('<BLL', 0x68, key, 0))
         assert_status(rsp)
@@ -916,6 +927,21 @@ class Sensor:
             assert_status(rsp)
 
             b = usb.wait_int()
+
+            # On 0xd51 (06cb:00b7 / 138a:00ab) the chip uses two distinct
+            # post-match interrupt types. Gate this block so other sensors
+            # keep their existing b[0]!=3 → generic-exception path intact.
+            if getattr(self, 'real_device_type', None) == 0xd51:
+                if b[0] == 5:
+                    # Clean no-match: chip scanned fine, no enrolled template
+                    # matched. Raise FingerNotMatchedException so the caller
+                    # can emit verify-no-match without retrying the capture.
+                    raise FingerNotMatchedException(
+                        '0xd51 no-match interrupt: %s' % hexlify(b).decode())
+                # b[0]==0 or anything else falls through to the generic check
+                # below, which raises a plain Exception and triggers a capture
+                # retry via update_cb in identify().
+
             if b[0] != 3:
                 raise Exception('Finger not recognized: %s' % hexlify(b).decode())
 
@@ -944,18 +970,22 @@ class Sensor:
             try:
                 glow_start_scan()
                 self.capture(CaptureMode.IDENTIFY)
-                break
+                return self.match_finger()
+            except FingerNotMatchedException:
+                # Clean no-match (chip says no enrolled template matched).
+                # Propagate directly — no point retrying the capture.
+                raise
             except usb_core.USBError as e:
                 raise e
             except CancelledException as e:
                 glow_end_scan()
                 raise e
             except Exception as e:
-                # Capture failed, retry
+                # Capture or scan-state failure (e.g. b[0]=0 bad-quality
+                # interrupt, unexpected interrupt type, get_prg_status2
+                # error). Hint the user to retry via update_cb.
                 update_cb(e)
                 sleep(1)
-
-        return self.match_finger()
 
     def get_finger_blobs(self, usrid: int, subtype: int):
         usr = db.get_user(usrid)

@@ -24,7 +24,7 @@ from usb import core as usb_core
 from validitysensor import init
 from validitysensor.db import subtype_to_string, db, SidIdentity, User
 from validitysensor.init_data_dir import PYTHON_VALIDITY_DATA_DIR, init_data_dir
-from validitysensor.sensor import sensor, RebootException
+from validitysensor.sensor import sensor, RebootException, FingerNotMatchedException
 from validitysensor.sid import sid_from_string
 from validitysensor.tls import tls
 from validitysensor.usb import usb
@@ -126,6 +126,11 @@ class Device(dbus.service.Object):
             retry_count[0] += 1
             logging.info('Chip capture retry-scan #%d (user=%s)',
                          retry_count[0], user)
+            # update_cb is only called when capture() raises a non-USB,
+            # non-cancellation exception (e.g. b[0]=0 scan-state error,
+            # unexpected interrupt type). This is a genuine mid-scan failure,
+            # not pre-touch idle noise, so verify-retry-scan is appropriate.
+            self.VerifyStatus('verify-retry-scan', False)
 
         def run():
             try:
@@ -135,6 +140,10 @@ class Device(dbus.service.Object):
                     self.VerifyStatus('verify-match', True)
                 else:
                     self.VerifyStatus('verify-no-match', True)
+            except FingerNotMatchedException:
+                # Chip scanned successfully but no enrolled template matched.
+                # Emit verify-no-match directly — no retry, no log spam.
+                self.VerifyStatus('verify-no-match', True)
             except usb_core.USBError as e:
                 logging.exception(e)
                 self.VerifyStatus('verify-no-match', True)
