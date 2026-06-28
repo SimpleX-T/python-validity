@@ -92,8 +92,8 @@ class FirmwareInfo:
 def get_fw_info(partition: int):
     rsp = tls.cmd(pack('<BB', 0x43, partition))
 
-    # don't want to throw exception here - it is normal not to have FW when we're about to upload it
-    if len(rsp) == 2 and rsp[1] == 4 and rsp[0] == 0xb0:
+    err, = unpack('<H', rsp[:2])
+    if err in (0x04b0, 0x044f):
         return None
 
     assert_status(rsp)
