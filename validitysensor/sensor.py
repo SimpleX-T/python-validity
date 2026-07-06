@@ -26,6 +26,7 @@ calib_data_path = PYTHON_VALIDITY_DATA_DIR + 'calib-data.bin'
 line_update_type1_devices = [
     0xB5, 0x885, 0xB3, 0x143B, 0x1055, 0xE1, 0x8B1, 0xEA, 0xE4, 0xED, 0x1825, 0x1FF5, 0x199,
     0xD51,  # HP EliteBook 840 G5 (138a:00ab) / HP G6 series (06cb:00b7)
+    0x969,  # HP ZBook Studio x360 G5 (138a:00ab -- same PID, different silicon)
 ]
 
 
@@ -227,14 +228,15 @@ class Sensor:
         self.device_info = identify_sensor()
         self.real_device_type = self.device_info.type
 
-        # Sensor type 0xd51 (HP EliteBook 840 G5 138a:00ab, HP G6 series 06cb:00b7)
-        # has no native SensorTypeInfo / SensorCaptureProg entry. Empirically the
-        # 0x199 profile produces images that the on-chip matcher accepts after
-        # enrollment/verify; the 0xdb profile does not. Spoofing keeps the rest
-        # of this method (calibration switch, capture program lookup) on a code
-        # path that works.
-        if self.device_info.type == 0xd51:
-            logging.info('Sensor type 0xd51 — aliasing to 0x199 profile')
+        # Sensor types 0xd51 (HP EliteBook 840 G5 138a:00ab, HP G6 series
+        # 06cb:00b7) and 0x969 (HP ZBook Studio x360 G5 138a:00ab -- same PID,
+        # different silicon) have no native SensorTypeInfo / SensorCaptureProg
+        # entry. Empirically the 0x199 profile produces images that the on-chip
+        # matcher accepts after enrollment/verify; the 0xdb profile does not.
+        # Spoofing keeps the rest of this method (calibration switch, capture
+        # program lookup) on a code path that works.
+        if self.device_info.type in (0xd51, 0x969):
+            logging.info('Sensor type 0x%x — aliasing to 0x199 profile' % self.device_info.type)
             self.device_info.type = 0x199
 
         logging.info('Opening sensor: %s' % self.device_info.name)
@@ -738,7 +740,7 @@ class Sensor:
                 b = usb.wait_int()
                 if b[0] == 2:
                     break
-                if b[0] == 3 and getattr(self, 'real_device_type', None) == 0xd51:
+                if b[0] == 3 and getattr(self, 'real_device_type', None) in (0xd51, 0x969):
                     saved_b = b
                     break
 
