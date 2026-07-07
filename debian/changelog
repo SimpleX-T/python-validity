@@ -1,3 +1,64 @@
+python-validity (0.16~hp8) noble; urgency=medium
+
+  * sensor.py: add support for sensor type 0x969 alongside 0xd51. HP
+    ZBook Studio x360 G5 uses the same 138a:00ab PID but a different
+    silicon variant reporting 0x969; HP G6 family on 06cb:00b7 also
+    covers this variant. Mirrors the existing 0xd51 handling across
+    line_update_type1_devices, the alias-to-0x199 block in
+    Sensor.open(), and the b[0]==3 interrupt fix in Sensor.capture().
+    Contributed by @ggiesen (SimpleX-T/python-validity#2), verified
+    on HP ZBook Studio x360 G5. Also independently developed by
+    @Karloss1234 on HP ZBook 17 G6.
+  * sensor.py: recover 0x969 chips reporting 0x199 post-resume. On
+    suspend/resume, 0x969 chips re-enumerate reporting sensor type
+    0x199 directly, causing Sensor.open() to skip the alias +
+    interrupt fix. Detect via the device name (FM-3439-xxx or
+    FM- 154-xxx — the two known 0x969 model families) and restore
+    real_device_type = 0x969. Diagnosed by @Karloss1234 on Kubuntu
+    26.04.
+  * init_flash.py, sensor.py: catch status 0404 from usb.cmd(reset_
+    blob) at init_flash() and factory_reset(), raise an actionable
+    error naming the chip-family limitation (0xd51 / 0x969 silicon
+    does not accept the reset_blob shipped by this driver, which
+    was extracted from Windows drivers for older 0x199-class chips).
+    No fix — until a working reset_blob for the newer chips is
+    obtained, init on factory-fresh chips and factory_reset for
+    Windows-Hello-paired chips remain unsupported on this family.
+    But the daemon no longer surfaces a bare "Failed: 0404" that
+    users can't act on. Reported by @bcoutts (fresh chip, HP ProBook
+    445R G6) and @ntoyiakhona06-creator (Windows-paired 840 G5).
+  * db.py: fix del_record missing db_write_enable. On 0x969 chips
+    the delete cmd (0x48) returns 04b6 silently without the
+    write-enable prefix, so records marked deleted never actually
+    freed flash space. Mirror new_record's shape: db_write_enable
+    + try/finally: call_cleanups(). Diagnosed by @Karloss1234 while
+    tracing 04b5 flash-full errors on enroll.
+  * db.py: proactive flash-full check in new_record. The chip does
+    not automatically compact the database partition after deletes,
+    so long-running Linux-only installs accumulate uncompacted
+    dead records until enroll fails at new_finger with an opaque
+    04b5. Use the db_info() call that was already there (with a
+    TODO to check the numbers) to actually check them; raise a
+    clear error naming the recovery path (erase_flash(4) + reboot)
+    before the on-wire failure.
+  * dbus-service: watchdog on VerifyStart. 0xd51 / 0x969 chips can
+    enter a "wedged capture-quality gate" state after long uptime +
+    heavy dev cycles where every captured frame is rejected and no
+    capture-complete interrupt is ever emitted — sensor.identify()
+    then loops in wait_int() indefinitely. Add a retry-count
+    threshold (25 consecutive retries, ~12-15s) that calls
+    sensor.cancel() and logs a specific "chip appears wedged; cold
+    power cycle required" warning to the journal. Recovery is a
+    real cold power cycle (shutdown, unplug charger, hold power
+    ~15s, boot) — the wedge sits below the daemon and no systemctl
+    restart can clear it.
+  * README: document Windows Hello template competition workarounds
+    (enroll different fingers per OS, or erase partition 4), the
+    Kubuntu / KDE lock-screen PAM stack recipe, and the known 0404
+    reset_blob issue.
+
+ -- SimpleX-T <ntmark2004@gmail.com>  Tue, 07 Jul 2026 23:27:29 +0100
+
 python-validity (0.16~hp7) noble; urgency=medium
 
   * usb.py: defensive USB reset at the start of open_dev(). The 0xd51-
