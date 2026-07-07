@@ -124,6 +124,19 @@ class Device(dbus.service.Object):
         retry_emitted = [False]
         retry_count = [0]
 
+        # Watchdog: 0xd51 / 0x969 chips can enter a "wedged capture-quality
+        # gate" state after long uptime + heavy dev cycles, where every
+        # captured frame is rejected and no capture-complete interrupt is
+        # ever emitted. sensor.identify() then loops in wait_int() until
+        # something external cancels it (pam_fprintd's 10s timeout). This
+        # threshold lets us abort daemon-side after ~25 rejected frames
+        # (typically 12-15s), emit a specific journal message pointing at
+        # the real recovery path (cold power cycle, not a systemctl
+        # restart), and unblock the identify() thread cleanly. See the
+        # discussion on PR uunicorn/python-validity#256 for the wedge
+        # signature and recovery notes.
+        CHIP_WEDGE_RETRY_THRESHOLD = 25
+
         def update_cb(e):
             # Always log every chip retry to journal — useful for the
             # task #17 capture-quality benchmark. The D-Bus emit below
@@ -132,6 +145,18 @@ class Device(dbus.service.Object):
             retry_count[0] += 1
             logging.info('Chip capture retry-scan #%d (user=%s)',
                          retry_count[0], user)
+            if retry_count[0] == CHIP_WEDGE_RETRY_THRESHOLD:
+                logging.warning(
+                    'Chip appears wedged after %d consecutive retries with '
+                    'no capture-complete interrupt. Aborting verify. This '
+                    'usually means the on-chip capture-quality gate is '
+                    'rejecting every frame, which the daemon cannot reset '
+                    'from userspace. Recovery: cold power cycle (shutdown, '
+                    'unplug charger, hold power ~15s, boot). A `systemctl '
+                    'restart python3-validity` is unlikely to help; the '
+                    'wedge is below the daemon.',
+                    retry_count[0])
+                sensor.cancel()
             if not retry_emitted[0]:
                 self.VerifyStatus('verify-retry-scan', False)
                 retry_emitted[0] = True
