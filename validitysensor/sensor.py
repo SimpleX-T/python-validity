@@ -238,6 +238,24 @@ class Sensor:
         if self.device_info.type in (0xd51, 0x969):
             logging.info('Sensor type 0x%x — aliasing to 0x199 profile' % self.device_info.type)
             self.device_info.type = 0x199
+        elif self.device_info.type == 0x199 and (
+                'FM-3439' in self.device_info.name or 'FM- 154' in self.device_info.name):
+            # After suspend/resume, 0x969 chips re-enumerate reporting sensor
+            # type 0x199 directly rather than 0x969. Without intervention the
+            # alias block above is skipped, real_device_type stays at 0x199,
+            # and capture()'s `b[0]==3` interrupt fix (which keys off
+            # real_device_type) is bypassed — so verify hangs indefinitely
+            # post-resume. The device *name* is stable across boot and resume,
+            # so we key off it: FM-3439-xxx and FM- 154-xxx are the two known
+            # 0x969 model families (HP ZBook 17 G6, ZBook Studio G5, ProBook
+            # G6). Genuine 0x199 chips (FM-3367-xxx, FM-3380-xxx, FM-155-xxx)
+            # don't match either pattern.
+            #
+            # 0xd51 users: if verify hangs after resume, please report — we
+            # may need the same treatment for 'FM-154-xxx' (no space).
+            logging.info('Sensor %s reporting 0x199 on resume — treating as 0x969'
+                         % self.device_info.name.strip())
+            self.real_device_type = 0x969
 
         logging.info('Opening sensor: %s' % self.device_info.name)
         self.type_info = SensorTypeInfo.get_by_type(self.device_info.type)
