@@ -85,7 +85,26 @@ def reboot():
 
 
 def factory_reset():
-    assert_status(usb.cmd(reset_blob))
+    rsp = usb.cmd(reset_blob)
+    status, = unpack('<H', rsp[:2])
+    if status == 0x404:
+        # See the equivalent handler in init_flash.py: the reset_blob shipped
+        # by this driver (extracted from Windows drivers for 0x199-class
+        # Prometheus chips) is rejected by 0xd51 / 0x969 silicon. There is
+        # currently no known way to factory-reset those chips via python-
+        # validity — @ntoyiakhona06-creator hit exactly this while trying to
+        # unpair a Windows-Hello-provisioned HP 840 G5 (PR uunicorn/
+        # python-validity#256).
+        raise Exception(
+            'factory_reset failed: reset_blob rejected with status 0404. '
+            'This chip family (likely 0xd51 or 0x969) does not accept the '
+            'reset_blob we ship. If you were trying to recover from a '
+            '"Signature verification failed" (Windows-Hello-paired chip), '
+            'the current workaround is to re-pair from the Windows side '
+            'first (uninstall the Synaptics driver in Windows, reboot, '
+            'let Windows reinstall it — then boot Linux). See '
+            'uunicorn/python-validity#256 for the tracking issue.')
+    assert_status(rsp)
     assert_status(usb.cmd(b'\x10' + b'\0' * 0x61))
     reboot()
 

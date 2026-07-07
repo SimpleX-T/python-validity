@@ -127,7 +127,25 @@ def init_flash():
     else:
         logging.info('Flash was not initialized yet. Formatting...')
 
-    assert_status(usb.cmd(reset_blob))
+    rsp = usb.cmd(reset_blob)
+    status, = unpack('<H', rsp[:2])
+    if status == 0x404:
+        # 0xd51 / 0x969 silicon (HP 840 G5, HP G6 family, ZBook Studio x360 G5)
+        # rejects the reset_blob captured from Windows drivers for 0x199-class
+        # Prometheus chips. reset_blob is byte-identical across blobs_97/9a/9d,
+        # so this is a chip-family issue, not a blob-selection bug. Reported by
+        # @bcoutts on PR uunicorn/python-validity#256 with a fresh-from-UEFI-
+        # reset ProBook 445R G6. Until we obtain a working reset_blob for this
+        # chip family, first-init on a factory-fresh 0xd51/0x969 sensor is not
+        # supported by this driver.
+        raise Exception(
+            'Failed to initialise flash on this sensor: reset_blob rejected '
+            'with status 0404. Known issue on 0xd51 / 0x969 silicon — the '
+            'reset_blob we ship was extracted from Windows drivers for 0x199-'
+            'class chips and is not accepted by these newer sensors. Please '
+            'add hardware details (dmidecode, lsusb -v, journalctl output) to '
+            'uunicorn/python-validity#256 so we can track affected models.')
+    assert_status(rsp)
 
     skey = ec.generate_private_key(ec.SECP256R1(), crypto_backend)
     snums = skey.private_numbers()
