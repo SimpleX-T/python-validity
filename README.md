@@ -85,6 +85,30 @@ $ sudo systemctl enable open-fprintd-resume open-fprintd-suspend
 
 For even more error procedures, check [this Arch comment thread](https://aur.archlinux.org/packages/python-validity/#comment-755904) or [this python-validity bug comment thread](https://github.com/uunicorn/python-validity/issues/3).
 
+#### `factory_reset` / `init_flash` fails with `0404`
+
+On 0xd51 and 0x969 silicon (HP EliteBook 840 G5, HP G6 family,
+HP ZBook Studio x360 G5, and likely other 138a:00ab / 06cb:00b7 variants)
+the `reset_blob` we ship — extracted from Windows drivers for older
+0x199-class Prometheus chips — is rejected by the chip with status `0404`.
+This affects two scenarios:
+
+- **Factory-fresh chip** (e.g. after a UEFI BIOS reset). `init_flash`
+  cannot format the flash and the daemon crash-loops.
+- **Windows-Hello-paired chip.** After hitting the "Signature verification
+  failed" error, users typically try `playground/factory-reset.py`; on
+  these chips it fails at the very first command with `0404`.
+
+There is currently **no known Linux-side workaround** — we do not have a
+reset_blob known to work on 0xd51 / 0x969. If you hit this, please add
+your hardware details (`dmidecode -t 1`, `lsusb -v`, and the failing
+journal output) to
+[uunicorn/python-validity#256](https://github.com/uunicorn/python-validity/pull/256)
+so affected models can be tracked. Windows-paired users can, as a
+workaround, boot Windows and reinstall the Synaptics driver (Device
+Manager → uninstall with "delete driver software" → reboot → let Windows
+reinstall) to re-pair the chip on the Windows side.
+
 ## Enabling fingerprint for system authentication
 
 if it doesn't come automatically, you might need to make changes to files in `/etc/pam.d` to enable fingerprint login (depending on your distro).
@@ -136,6 +160,49 @@ user_to_sid:
     "someotheruser": "S-1-5-21-1234567890-1234567890-1234567890-1003"
 ```
 Note the indentation; each entry has to be preceded by at least one space.
+
+### Template competition (0xd51 / 0x969 chips)
+
+The chip's on-chip matcher scores captured images against **every** enrolled
+template — including any Windows Hello templates written by a previous
+Windows session — and returns the highest-scoring match. On some HP models
+(reported for the ZBook G6 family, but likely broader) Windows Hello writes
+very high-quality templates that consistently outscore Linux `fprintd`
+templates for the same finger, so `fprintd-verify` silently loses even when
+enrollment succeeded.
+
+Two workarounds, in order of preference:
+
+1. **Enroll different fingers per OS.** Right-index in Linux, right-middle
+   in Windows (or whichever split you prefer). No competition, both OSes
+   keep fingerprint auth.
+2. **Erase the on-chip database from Linux.** Wipes all templates on both
+   OSes; Windows Hello fingerprint login stops working until you re-enroll
+   in Windows. PIN / TPM state is unaffected. See
+   `playground/erase-flash.py` (partition `4`).
+
+Investigated and documented by @Karloss1234 on PR
+[uunicorn/python-validity#256](https://github.com/uunicorn/python-validity/pull/256).
+
+### KDE / Kubuntu lock-screen PAM
+
+On Kubuntu the greeter/lock-screen PAM stacks aren't touched by
+`pam-auth-update`. To wire the fingerprint reader into the KDE lock screen
+you need three files under `/etc/pam.d` mirroring the same `sufficient`
+line:
+
+```
+# /etc/pam.d/kde, /etc/pam.d/kde-fingerprint, /etc/pam.d/kde-smartcard
+#%PAM-1.0
+auth    sufficient      pam_fprintd.so max_tries=3 timeout=10
+auth    required        pam_unix.so
+```
+
+Also check `/etc/pam.d/sddm-greeter` for a `pam_permit.so` fallback and
+replace it with `pam_unix.so` — otherwise the lock screen can unlock
+without authentication after fingerprint timeout.
+
+Contributed by @Karloss1234; not required on GNOME / Ubuntu proper.
 
 ## Playground
 
