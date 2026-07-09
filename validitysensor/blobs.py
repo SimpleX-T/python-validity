@@ -15,6 +15,8 @@ def __load_blob(blob: str) -> bytes:
             from . import blobs_9a as blobs
         elif usb.usb_dev().idProduct == 0x00b7:
             from . import blobs_9a as blobs   # HP G6 series; same sensor type as 0x00ab
+        elif usb.usb_dev().idProduct == 0x00cb:
+            from . import blobs_00cb as blobs   # HP Pavilion x360 14-dh; 0x969, own reset_blob
 
     globals()[blob] = getattr(blobs, blob)
     return globals()[blob]

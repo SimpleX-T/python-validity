@@ -32,6 +32,11 @@ FIRMWARE_URIS = {
         'driver': 'https://ftp.hp.com/pub/softpaq/sp135501-136000/sp135736.exe',
         'referral': 'https://support.hp.com/us-en/drivers',
         'sha512': 'f9a91e2796a5070f1f40099e2318aa9716e2e6a31b9ba6a93986c450eedbfb0b323dff55c5e4536466946da3e01985f367b1db27bbd7b65f4c333ce0cd47b78c'
+    },
+    SupportedDevices.DEV_CB: {
+        'driver': 'https://ftp.hp.com/pub/softpaq/sp138001-138500/sp138431.exe',
+        'referral': 'https://support.hp.com/us-en/drivers',
+        'sha512': 'b9a268773ac948a4b6bfaa7a5762c58ab482aa47ea321a429ebc8dba3fcdd17ffe750d189791d8e0325b21e95161db5f751c61d7714d7460ee0a406055060a8f'
     }
 }
 
@@ -45,4 +50,5 @@ FIRMWARE_NAMES = {
     # filename matches what extracted from HP's Windows driver (sp135736.exe).
     SupportedDevices.DEV_AB: '6_07f_hp_cmit_mis_qm.xpfwext',  # HP EliteBook 840 G5
     SupportedDevices.DEV_B7: '6_07f_hp_cmit_mis_qm.xpfwext',  # HP G6 series (same chip family)
+    SupportedDevices.DEV_CB: '6_07f_hp_mis_qm.xpfwext',  # HP Pavilion x360 14-dh (0x969)
 }

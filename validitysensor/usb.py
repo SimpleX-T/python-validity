@@ -21,6 +21,7 @@ class SupportedDevices(Enum):
     DEV_9a = (0x06cb, 0x009a)
     DEV_AB = (0x138a, 0x00ab)  # HP EliteBook 840 G5 — sensor type 0xd51
     DEV_B7 = (0x06cb, 0x00b7)  # HP G6 series — sensor type 0xd51
+    DEV_CB = (0x06cb, 0x00cb)  # HP Pavilion x360 14-dh -- sensor type 0x969
 
     @classmethod
     def from_usbid(cls, vendorid, productid):
