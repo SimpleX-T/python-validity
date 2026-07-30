@@ -162,23 +162,41 @@ class Device(dbus.service.Object):
                 retry_emitted[0] = True
 
         def run():
-            try:
-                # TODO: pass down the user db record id and implement a proper Sensor.verify() method
-                usrid, subtype, hsh = sensor.identify(update_cb)
-                if usr.dbid == usrid:
-                    self.VerifyStatus('verify-match', True)
-                else:
-                    logging.info("Fingerprint matched another user template")
+            max_attempts = 3
+            attempts = 0
+            while attempts < max_attempts:
+                try:
+                    # TODO: pass down the user db record id and implement a proper Sensor.verify() method
+                    usrid, subtype, hsh = sensor.identify(update_cb)
+                    if usr.dbid == usrid:
+                        self.VerifyStatus('verify-match', True)
+                        break
+                    else:
+                        logging.info("Fingerprint matched another user template")
+                        self.VerifyStatus('verify-no-match', True)
+                        break
+                except FingerNotMatchedException:
+                    attempts += 1
+                    logging.info(
+                        "Fingerprint captured but no template found (%d/%d)",
+                        attempts,
+                        max_attempts
+                    )
+                    self.VerifyStatus('verify-no-match', False)
+                    time.sleep(1)
+                    continue
+                except usb_core.USBError as e:
+                    logging.exception(e)
                     self.VerifyStatus('verify-no-match', True)
-            except FingerNotMatchedException:
-                logging.info("Fingerprint captured but no template found")
-                self.VerifyStatus('verify-no-match', True)
-            except usb_core.USBError as e:
-                logging.exception(e)
-                self.VerifyStatus('verify-no-match', True)
-                loop.quit()
-            except Exception as e:
-                logging.exception(e)
+                    loop.quit()
+                    break
+                except Exception as e:
+                    logging.exception(e)
+                    self.VerifyStatus('verify-no-match', True)
+                    time.sleep(1)
+                    continue
+            if attempts >= max_attempts:
+                logging.info("Maximum fingerprint attempts reached")
                 self.VerifyStatus('verify-no-match', True)
 
         thread = Thread(target=run)
