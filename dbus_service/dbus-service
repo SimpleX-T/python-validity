@@ -24,7 +24,7 @@ from usb import core as usb_core
 from validitysensor import init
 from validitysensor.db import subtype_to_string, db, SidIdentity, User
 from validitysensor.init_data_dir import PYTHON_VALIDITY_DATA_DIR, init_data_dir
-from validitysensor.sensor import sensor, RebootException
+from validitysensor.sensor import sensor, RebootException, FingerNotMatchedException
 from validitysensor.sid import sid_from_string
 from validitysensor.tls import tls
 from validitysensor.usb import usb
@@ -168,7 +168,11 @@ class Device(dbus.service.Object):
                 if usr.dbid == usrid:
                     self.VerifyStatus('verify-match', True)
                 else:
+                    logging.info("Fingerprint matched another user template")
                     self.VerifyStatus('verify-no-match', True)
+            except FingerNotMatchedException:
+                logging.info("Fingerprint captured but no template found")
+                self.VerifyStatus('verify-no-match', True)
             except usb_core.USBError as e:
                 logging.exception(e)
                 self.VerifyStatus('verify-no-match', True)
