@@ -5,6 +5,8 @@ python-validity (0.16~hp9) noble; urgency=medium
     capture handling to stop working after the first reopen.
   * Persist calibration under /var/lib/python-validity instead of tmpfs-backed
     /var/run so enrolled templates remain usable across reboot.
+  * Add hardware-validated 06cb:00cb support, including its device-specific
+    reset blob and HP firmware package.
 
  -- Dev Tochukwu <devtochukwu@users.noreply.github.com>  Sun, 02 Aug 2026 18:00:00 +0100
 
