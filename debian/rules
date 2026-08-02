@@ -5,6 +5,9 @@
 %:
 	dh $@ --with python3 --buildsystem=pybuild
 
+override_dh_auto_test:
+	PYTHONPATH=$(CURDIR) python3 -m unittest discover -s tests -v
+
 override_dh_installsystemd:
 	dh_installsystemd --name=python3-validity
 
@@ -13,4 +16,3 @@ override_dh_auto_install:
 
 override_dh_auto_clean:
 	python3 ./setup.py clean
-

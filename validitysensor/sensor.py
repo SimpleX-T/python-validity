@@ -14,14 +14,14 @@ from .blobs import reset_blob
 from .db import db, SidIdentity
 from .flash import write_enable, call_cleanups, read_flash, erase_flash, write_flash_all, read_flash_all
 from .hw_tables import dev_info_lookup
-from .init_data_dir import PYTHON_VALIDITY_DATA_DIR
+from .init_data_dir import PYTHON_VALIDITY_STATE_DIR
 from .table_types import SensorTypeInfo, SensorCaptureProg
 from .tls import tls
 from .usb import usb, CancelledException
 from .util import assert_status, unhex
 
 # TODO: this should be specific to an individual device (system may have more than one sensor)
-calib_data_path = PYTHON_VALIDITY_DATA_DIR + 'calib-data.bin'
+calib_data_path = PYTHON_VALIDITY_STATE_DIR + 'calib-data.bin'
 
 line_update_type1_devices = [
     0xB5, 0x885, 0xB3, 0x143B, 0x1055, 0xE1, 0x8B1, 0xEA, 0xE4, 0xED, 0x1825, 0x1FF5, 0x199,
@@ -329,8 +329,13 @@ class Sensor:
         self.calibrate()
 
     def save(self):
-        with open(calib_data_path, 'wb') as f:
+        temporary_path = calib_data_path + '.new'
+        with open(temporary_path, 'wb') as f:
             f.write(self.calib_data)
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(temporary_path, 0o600)
+        os.replace(temporary_path, calib_data_path)
 
     # This is the exact logic from the DLL.
     # If it looks broken that was probably intended.

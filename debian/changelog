@@ -1,3 +1,13 @@
+python-validity (0.16~hp9) noble; urgency=medium
+
+  * Keep hardware-table identities immutable across sensor reopen. Profile
+    aliasing previously mutated the shared DeviceInfo entry, causing d51/969
+    capture handling to stop working after the first reopen.
+  * Persist calibration under /var/lib/python-validity instead of tmpfs-backed
+    /var/run so enrolled templates remain usable across reboot.
+
+ -- Dev Tochukwu <devtochukwu@users.noreply.github.com>  Sun, 02 Aug 2026 18:00:00 +0100
+
 python-validity (0.16~hp8) noble; urgency=medium
 
   * sensor.py: add support for sensor type 0x969 alongside 0xd51. HP
