@@ -1,3 +1,13 @@
+python-validity (0.16~hp14) noble; urgency=medium
+
+  * Retry open-fprintd device registration when fprintd appears before the
+    python-validity D-Bus service is ready. Registration now uses bounded
+    exponential backoff, ignores callbacks from stale owner generations, and
+    remains idempotent across service restarts, eliminating a boot-time race
+    that previously required a manual daemon restart.
+
+ -- Dev Tochukwu <devtochukwu@users.noreply.github.com>  Mon, 03 Aug 2026 14:00:00 +0100
+
 python-validity (0.16~hp13) noble; urgency=medium
 
   * Pair every glow/scan start with a stop before retrying a rejected capture.
