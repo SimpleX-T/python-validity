@@ -18,6 +18,10 @@ import dbus.mainloop.glib
 import dbus.service
 import yaml
 from gi.repository import GLib
+try:
+    from gi.repository import GLibUnix
+except ImportError:  # PyGObject versions before the split namespace
+    GLibUnix = None
 from usb import core as usb_core
 
 from validitysensor import init
@@ -27,7 +31,7 @@ from validitysensor.operation import OperationBusy, OperationController
 from validitysensor.sensor import sensor, RebootException
 from validitysensor.sid import sid_from_string
 from validitysensor.tls import tls
-from validitysensor.usb import usb
+from validitysensor.usb import usb, CancelledException
 from validitysensor.fingerprint_constants import finger_ids
 
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
@@ -192,6 +196,9 @@ class Device(dbus.service.Object):
                 logging.exception(e)
                 self.VerifyStatus('verify-no-match', True)
                 loop.quit()
+            except CancelledException:
+                logging.info('Fingerprint verification cancelled')
+                self.VerifyStatus('verify-no-match', True)
             except Exception as e:
                 logging.exception(e)
                 self.VerifyStatus('verify-no-match', True)
@@ -223,6 +230,9 @@ class Device(dbus.service.Object):
                 logging.exception(e)
                 self.EnrollStatus('enroll-failed', True)
                 loop.quit()
+            except CancelledException:
+                logging.info('Fingerprint enrollment cancelled')
+                self.EnrollStatus('enroll-failed', True)
             except Exception as e:
                 logging.exception(e)
                 self.EnrollStatus('enroll-failed', True)
@@ -351,8 +361,9 @@ def main():
         logging.info('Caught signal %d. Stopping...' % x)
         loop.quit()
 
-    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, die, signal.SIGINT)
-    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, die, signal.SIGINT)
+    signal_add = GLibUnix.signal_add if GLibUnix else GLib.unix_signal_add
+    signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, die, signal.SIGINT)
+    signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, die, signal.SIGTERM)
     try:
         loop.run()
     except Exception as e:

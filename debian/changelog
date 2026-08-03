@@ -1,3 +1,24 @@
+python-validity (0.16~hp11) noble; urgency=medium
+
+  * Always end the chip-side scan/glow session after identify, including normal
+    match and no-match returns. Previously only cancellation performed this
+    teardown, allowing repeated PAM and desktop verifies to accumulate stale
+    sensor state until a cold boot temporarily restored operation.
+  * Treat client cancellation as an expected outcome instead of logging a full
+    error traceback.
+  * Cache extracted proprietary firmware persistently under /var/lib and
+    migrate existing /var/run copies, avoiding a download on every reboot.
+  * Add complete 06cb:00cb udev activation, require the HP CAB extractor, and
+    restart the service automatically on operational failure.
+  * Disable verbose protocol tracing in the default systemd service so raw
+    fingerprint frames and TLS key material are not written to the journal.
+  * Keep matched internal readers out of USB runtime autosuspend; these chips
+    do not reliably restore their private capture state after an idle suspend.
+  * Use GLibUnix.signal_add on current PyGObject releases, with compatibility
+    fallback, and report SIGTERM correctly instead of labelling it SIGINT.
+
+ -- Dev Tochukwu <devtochukwu@users.noreply.github.com>  Mon, 03 Aug 2026 12:30:00 +0100
+
 python-validity (0.16~hp10) noble; urgency=medium
 
   * Make USB cancellation persistent until the owning operation exits, fixing

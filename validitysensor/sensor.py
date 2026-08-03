@@ -987,22 +987,28 @@ class Sensor:
             tls.app(unhexlify('6200000000'))
 
     def identify(self, update_cb: typing.Callable[[Exception], None]):
-        while True:
-            try:
-                glow_start_scan()
-                self.capture(CaptureMode.IDENTIFY)
-                break
-            except usb_core.USBError as e:
-                raise e
-            except CancelledException as e:
-                glow_end_scan()
-                raise e
-            except Exception as e:
-                # Capture failed, retry
-                update_cb(e)
-                sleep(1)
+        try:
+            while True:
+                try:
+                    glow_start_scan()
+                    self.capture(CaptureMode.IDENTIFY)
+                    break
+                except usb_core.USBError as e:
+                    raise e
+                except CancelledException as e:
+                    raise e
+                except Exception as e:
+                    # Capture failed, retry
+                    update_cb(e)
+                    sleep(1)
 
-        return self.match_finger()
+            return self.match_finger()
+        finally:
+            # A normal match used to leave scan/glow mode armed indefinitely;
+            # only cancellation shut it down. Always retire the chip-side scan
+            # session so repeated PAM and desktop verifies start from a clean
+            # state instead of degrading until the next cold boot.
+            glow_end_scan()
 
     def get_finger_blobs(self, usrid: int, subtype: int):
         usr = db.get_user(usrid)
