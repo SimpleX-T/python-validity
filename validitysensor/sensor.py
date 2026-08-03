@@ -1006,12 +1006,11 @@ class Sensor:
             tls.app(unhexlify('6200000000'))
 
     def identify(self, update_cb: typing.Callable[[Exception], None]):
-        try:
-            while True:
+        while True:
+            glow_start_scan()
+            try:
                 try:
-                    glow_start_scan()
                     self.capture(CaptureMode.IDENTIFY)
-                    break
                 except usb_core.USBError as e:
                     raise e
                 except CancelledException as e:
@@ -1020,14 +1019,15 @@ class Sensor:
                     # Capture failed, retry
                     update_cb(e)
                     sleep(1)
+                    continue
 
-            return self.match_finger()
-        finally:
-            # A normal match used to leave scan/glow mode armed indefinitely;
-            # only cancellation shut it down. Always retire the chip-side scan
-            # session so repeated PAM and desktop verifies start from a clean
-            # state instead of degrading until the next cold boot.
-            glow_end_scan()
+                return self.match_finger()
+            finally:
+                # Pair every scan start with a stop, including each rejected
+                # capture before the next retry. Deferring this until the whole
+                # identify call exits stacks scan sessions during poor-contact
+                # retries and eventually wedges the chip's quality gate.
+                glow_end_scan()
 
     def get_finger_blobs(self, usrid: int, subtype: int):
         usr = db.get_user(usrid)

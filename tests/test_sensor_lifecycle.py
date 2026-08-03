@@ -27,6 +27,22 @@ class SensorLifecycleTests(unittest.TestCase):
         glow_start.assert_called_once_with()
         glow_end.assert_called_once_with()
 
+    @patch('validitysensor.sensor.sleep')
+    @patch('validitysensor.sensor.glow_end_scan')
+    @patch('validitysensor.sensor.glow_start_scan')
+    def test_each_rejected_capture_ends_before_retrying(
+            self, glow_start, glow_end, _sleep):
+        expected = (12, 3, b'hash')
+        rejected = RuntimeError('capture quality rejected')
+        updates = []
+        with patch.object(sensor, 'capture', side_effect=[rejected, None]), \
+                patch.object(sensor, 'match_finger', return_value=expected):
+            self.assertEqual(sensor.identify(updates.append), expected)
+
+        self.assertEqual(updates, [rejected])
+        self.assertEqual(glow_start.call_count, 2)
+        self.assertEqual(glow_end.call_count, 2)
+
 
 if __name__ == '__main__':
     unittest.main()

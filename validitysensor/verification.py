@@ -13,4 +13,3 @@ def identify_with_retries(identify, update_cb, retry_cb, max_attempts=3):
             if attempt == max_attempts:
                 raise
             retry_cb(attempt, max_attempts)
-

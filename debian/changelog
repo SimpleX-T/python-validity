@@ -1,3 +1,14 @@
+python-validity (0.16~hp13) noble; urgency=medium
+
+  * Pair every glow/scan start with a stop before retrying a rejected capture.
+    The previous whole-verification teardown still stacked chip-side scan
+    sessions when poor-contact frames repeated, recreating the quality-gate
+    wedge after enough retries.
+  * Add a regression test that rejects one capture, succeeds on the next, and
+    proves both attempts receive independent start/stop lifecycle pairs.
+
+ -- Dev Tochukwu <devtochukwu@users.noreply.github.com>  Mon, 03 Aug 2026 13:00:00 +0100
+
 python-validity (0.16~hp12) noble; urgency=medium
 
   * Recognize the sensor-specific no-template interrupts (5 on 0xd51, 4 on
