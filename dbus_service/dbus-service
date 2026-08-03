@@ -28,6 +28,7 @@ from validitysensor import init
 from validitysensor.db import subtype_to_string, db, SidIdentity, User
 from validitysensor.init_data_dir import PYTHON_VALIDITY_DATA_DIR, init_data_dir
 from validitysensor.operation import OperationBusy, OperationController
+from validitysensor.registration import RetryingRegistrar
 from validitysensor.sensor import sensor, RebootException, FingerNotMatchedException
 from validitysensor.sid import sid_from_string
 from validitysensor.tls import tls
@@ -360,14 +361,29 @@ def main():
 
     svc = Device(bus, config)
 
+    def register_device(name):
+        mgr = bus.get_object(name, '/net/reactivated/Fprint/Manager')
+        mgr = dbus.Interface(mgr, 'net.reactivated.Fprint.Manager')
+        mgr.RegisterDevice(svc)
+        logging.info('Fingerprint device registered with open-fprintd')
+
+    def registration_failed(error, attempt, delay):
+        logging.warning(
+            'open-fprintd registration attempt %d failed: %s; retrying in %ds',
+            attempt, error, delay)
+
+    registrar = RetryingRegistrar(
+        register_device,
+        GLib.timeout_add_seconds,
+        registration_failed,
+    )
+
     def watch_cb(name):
         if name == '':
-            logging.debug('Manager is offline')
+            logging.info('open-fprintd manager is offline')
         else:
-            logging.debug('Manager is back online, registering')
-            mgr = bus.get_object(name, '/net/reactivated/Fprint/Manager')
-            mgr = dbus.Interface(mgr, 'net.reactivated.Fprint.Manager')
-            mgr.RegisterDevice(svc)
+            logging.info('open-fprintd manager is online')
+        registrar.owner_changed(name)
 
     watcher = bus.watch_name_owner('net.reactivated.Fprint', watch_cb)
 
