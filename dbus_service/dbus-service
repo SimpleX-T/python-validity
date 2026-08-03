@@ -28,10 +28,11 @@ from validitysensor import init
 from validitysensor.db import subtype_to_string, db, SidIdentity, User
 from validitysensor.init_data_dir import PYTHON_VALIDITY_DATA_DIR, init_data_dir
 from validitysensor.operation import OperationBusy, OperationController
-from validitysensor.sensor import sensor, RebootException
+from validitysensor.sensor import sensor, RebootException, FingerNotMatchedException
 from validitysensor.sid import sid_from_string
 from validitysensor.tls import tls
 from validitysensor.usb import usb, CancelledException
+from validitysensor.verification import identify_with_retries
 from validitysensor.fingerprint_constants import finger_ids
 
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
@@ -185,13 +186,29 @@ class Device(dbus.service.Object):
                 retry_emitted[0] = True
 
         def run():
+            max_match_attempts = 3
+            def clean_no_match(attempt, maximum):
+                logging.info(
+                    'Valid fingerprint capture matched no template (%d/%d)',
+                    attempt, maximum)
+                self.VerifyStatus('verify-no-match', False)
+
             try:
                 # TODO: pass down the user db record id and implement a proper Sensor.verify() method
-                usrid, subtype, hsh = sensor.identify(update_cb)
+                usrid, subtype, hsh = identify_with_retries(
+                    sensor.identify,
+                    update_cb,
+                    clean_no_match,
+                    max_attempts=max_match_attempts,
+                )
                 if usr.dbid == usrid:
                     self.VerifyStatus('verify-match', True)
                 else:
+                    # A different user's (or Windows Hello) template really
+                    # matched; retrying cannot change template ownership.
                     self.VerifyStatus('verify-no-match', True)
+            except FingerNotMatchedException:
+                self.VerifyStatus('verify-no-match', True)
             except usb_core.USBError as e:
                 logging.exception(e)
                 self.VerifyStatus('verify-no-match', True)

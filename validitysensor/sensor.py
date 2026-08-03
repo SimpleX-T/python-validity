@@ -23,6 +23,11 @@ from .util import assert_status, unhex
 # TODO: this should be specific to an individual device (system may have more than one sensor)
 calib_data_path = PYTHON_VALIDITY_STATE_DIR + 'calib-data.bin'
 
+
+class FingerNotMatchedException(Exception):
+    """A valid capture completed, but no on-chip template matched."""
+
+
 line_update_type1_devices = [
     0xB5, 0x885, 0xB3, 0x143B, 0x1055, 0xE1, 0x8B1, 0xEA, 0xE4, 0xED, 0x1825, 0x1FF5, 0x199,
     0xD51,  # HP EliteBook 840 G5 (138a:00ab) / HP G6 series (06cb:00b7)
@@ -963,6 +968,20 @@ class Sensor:
             assert_status(rsp)
 
             b = usb.wait_int()
+
+            # These related chips use different interrupts for a successful
+            # high-quality capture that matched no enrolled template. Keep
+            # this distinct from capture-quality failures so the D-Bus layer
+            # can offer a bounded retry for occasional matcher false negatives.
+            no_match_interrupt = {
+                0xd51: 5,
+                0x969: 4,
+            }.get(getattr(self, 'real_device_type', None))
+            if no_match_interrupt is not None and b[0] == no_match_interrupt:
+                raise FingerNotMatchedException(
+                    'No-template interrupt for sensor 0x%x: %s'
+                    % (self.real_device_type, hexlify(b).decode()))
+
             if b[0] != 3:
                 raise Exception('Finger not recognized: %s' % hexlify(b).decode())
 
