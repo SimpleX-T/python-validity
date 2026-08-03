@@ -1,3 +1,13 @@
+python-validity (0.16~hp10) noble; urgency=medium
+
+  * Make USB cancellation persistent until the owning operation exits, fixing
+    a race where wait_int discarded Cancel and left orphan verify workers.
+  * Enforce exclusive sensor ownership across verify, enroll, and resume so a
+    timed-out desktop or PAM client cannot keep scanning in the background and
+    eventually wedge the capture-quality gate.
+
+ -- Dev Tochukwu <devtochukwu@users.noreply.github.com>  Mon, 03 Aug 2026 09:00:00 +0100
+
 python-validity (0.16~hp9) noble; urgency=medium
 
   * Keep hardware-table identities immutable across sensor reopen. Profile

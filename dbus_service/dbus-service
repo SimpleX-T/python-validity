@@ -12,7 +12,6 @@ import time
 import typing
 from binascii import hexlify, unhexlify
 from pathlib import Path
-from threading import Thread
 
 import dbus
 import dbus.mainloop.glib
@@ -24,6 +23,7 @@ from usb import core as usb_core
 from validitysensor import init
 from validitysensor.db import subtype_to_string, db, SidIdentity, User
 from validitysensor.init_data_dir import PYTHON_VALIDITY_DATA_DIR, init_data_dir
+from validitysensor.operation import OperationBusy, OperationController
 from validitysensor.sensor import sensor, RebootException
 from validitysensor.sid import sid_from_string
 from validitysensor.tls import tls
@@ -45,10 +45,26 @@ class NoEnrolledPrints(dbus.DBusException):
         super().__init__('No enrolled prints found')
 
 
+class DeviceBusy(dbus.DBusException):
+    _dbus_error_name = 'net.reactivated.Fprint.Error.AlreadyInUse'
+
+    def __init__(self):
+        super().__init__('Fingerprint sensor is finishing a previous operation')
+
+
 class Device(dbus.service.Object):
     def __init__(self, bus_name: dbus.Bus, config: typing.Dict[str, typing.Any]):
         dbus.service.Object.__init__(self, bus_name, '/io/github/uunicorn/Fprint/Device')
         self.config = config
+        self.operations = OperationController(sensor.begin_operation, sensor.cancel)
+
+    def start_operation(self, target):
+        """Give one worker exclusive sensor ownership and retire its predecessor."""
+        try:
+            self.operations.start(target)
+        except OperationBusy:
+            logging.error('Previous fingerprint operation did not stop within 2 seconds')
+            raise DeviceBusy()
 
     def user2identity(self, user: str) -> SidIdentity:
         """Compute UID to SID mapping"""
@@ -67,10 +83,13 @@ class Device(dbus.service.Object):
     @dbus.service.method(dbus_interface=INTERFACE_NAME, in_signature='', out_signature='')
     def Suspend(self):
         logging.debug('In Suspend')
+        sensor.cancel()
 
     @dbus.service.method(dbus_interface=INTERFACE_NAME, in_signature='', out_signature='')
     def Resume(self):
         logging.debug('In Resume')
+        if not self.operations.cancel(timeout=2):
+            raise DeviceBusy()
         tls.reset()
         try:
             init.open_common()
@@ -177,9 +196,7 @@ class Device(dbus.service.Object):
                 logging.exception(e)
                 self.VerifyStatus('verify-no-match', True)
 
-        thread = Thread(target=run)
-        thread.daemon = True
-        thread.start()
+        self.start_operation(run)
 
     @dbus.service.method(dbus_interface=INTERFACE_NAME, in_signature='', out_signature='')
     def Cancel(self):
@@ -215,9 +232,7 @@ class Device(dbus.service.Object):
                               winbio_name + ')')
             self.EnrollStatus('enroll-failed', True)
         else:
-            thread = Thread(target=run)
-            thread.daemon = True
-            thread.start()
+            self.start_operation(run)
 
     @dbus.service.signal(dbus_interface=INTERFACE_NAME, signature='sb')
     def VerifyStatus(self, result, done):

@@ -761,7 +761,10 @@ class Sensor:
         self.save()
 
     def cancel(self):
-        usb.cancel = True
+        usb.request_cancel()
+
+    def begin_operation(self):
+        usb.clear_cancel()
 
     def capture(self, mode: CaptureMode) -> typing.Tuple[int, int, int, int]:
         try:

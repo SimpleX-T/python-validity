@@ -5,6 +5,7 @@ import typing
 from binascii import hexlify, unhexlify
 from enum import Enum
 from struct import unpack
+from threading import Event
 
 import usb.core as ucore
 from usb.core import USBError
@@ -39,7 +40,7 @@ class Usb:
     def __init__(self):
         self.trace_enabled = False
         self.dev: typing.Optional[ucore.Device] = None
-        self.cancel = False
+        self.cancel_event = Event()
 
     def open(self, vendor=None, product=None):
         if vendor is not None and product is not None:
@@ -150,14 +151,18 @@ class Usb:
             self.trace('<130< Error: %s' % repr(e))
             return None
 
-    # FIXME There is a chance of a race condition here
-    def cancel(self):
-        self.cancel = True
+    def request_cancel(self):
+        """Cancel the current operation without losing an early request."""
+        self.cancel_event.set()
+
+    def clear_cancel(self):
+        """Arm the USB transport for a new, exclusively-owned operation."""
+        self.cancel_event.clear()
 
     def wait_int(self):
-        self.cancel = False
-
         while True:
+            if self.cancel_event.is_set():
+                raise CancelledException()
             try:
                 resp = self.dev.read(131, 1024, timeout=100)
                 resp = bytes(resp)
@@ -165,7 +170,7 @@ class Usb:
                 return resp
             except USBError as e:
                 if e.errno == errno.ETIMEDOUT:
-                    if self.cancel:
+                    if self.cancel_event.is_set():
                         raise CancelledException()
                 else:
                     raise e
