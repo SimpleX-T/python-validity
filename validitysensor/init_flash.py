@@ -14,7 +14,13 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from .blobs import reset_blob
 from .flash import write_flash, erase_flash, call_cleanups, PartitionInfo, get_flash_info, FlashInfo
 from .hw_tables import FlashIcInfo
-from .sensor import reboot, RomInfo
+from .sensor import (
+    reboot,
+    RomInfo,
+    identify_sensor,
+    read_hw_reg32,
+    write_hw_reg32,
+)
 from .tls import tls, hs_key, crt_hardcoded
 from .usb import usb
 from .util import assert_status, unhex
@@ -54,6 +60,24 @@ ac2c08c00abf43faa5528a0a8e49b02c507b01b6f1c9abffc669d8c84d7e4a714da32aade7928eca
 ''')
 
 crypto_backend = default_backend()
+
+
+def prepare_clean_slate_reset():
+    """Put d51-family ROMs into the state expected by their reset payload.
+
+    This is the exact cleartext preflight observed immediately before packet
+    78 in the clean-slate Windows capture attached to PR #256.
+    """
+    write_hw_reg32(0x8000205c, 7)
+    if read_hw_reg32(0x80002080) not in [2, 3]:
+        raise Exception('Unexpected register value during clean-slate reset')
+    identify_sensor()
+    call_cleanups()
+
+
+def is_d51_reset_family():
+    dev = usb.usb_dev()
+    return (dev.idVendor, dev.idProduct) in ((0x138a, 0x00ab), (0x06cb, 0x00b7))
 
 
 def with_hdr(id: int, buf: bytes):
@@ -127,24 +151,11 @@ def init_flash():
     else:
         logging.info('Flash was not initialized yet. Formatting...')
 
+    if is_d51_reset_family():
+        prepare_clean_slate_reset()
+
     rsp = usb.cmd(reset_blob)
     status, = unpack('<H', rsp[:2])
-    if status == 0x404:
-        # 0xd51 / 0x969 silicon (HP 840 G5, HP G6 family, ZBook Studio x360 G5)
-        # rejects the reset_blob captured from Windows drivers for 0x199-class
-        # Prometheus chips. reset_blob is byte-identical across blobs_97/9a/9d,
-        # so this is a chip-family issue, not a blob-selection bug. Reported by
-        # @bcoutts on PR uunicorn/python-validity#256 with a fresh-from-UEFI-
-        # reset ProBook 445R G6. Until we obtain a working reset_blob for this
-        # chip family, first-init on a factory-fresh 0xd51/0x969 sensor is not
-        # supported by this driver.
-        raise Exception(
-            'Failed to initialise flash on this sensor: reset_blob rejected '
-            'with status 0404. Known issue on 0xd51 / 0x969 silicon — the '
-            'reset_blob we ship was extracted from Windows drivers for 0x199-'
-            'class chips and is not accepted by these newer sensors. Please '
-            'add hardware details (dmidecode, lsusb -v, journalctl output) to '
-            'uunicorn/python-validity#256 so we can track affected models.')
     assert_status(rsp)
 
     skey = ec.generate_private_key(ec.SECP256R1(), crypto_backend)

@@ -9,12 +9,12 @@ def __load_blob(blob: str) -> bytes:
         elif usb.usb_dev().idProduct == 0x009d:
             from . import blobs_9d as blobs
         elif usb.usb_dev().idProduct == 0x00ab:
-            from . import blobs_97 as blobs   # HP EliteBook 840 G5; verified
+            from . import blobs_d51 as blobs  # HP EliteBook 840 G5; d51 reset family
     elif usb.usb_dev().idVendor == 0x06cb:
         if usb.usb_dev().idProduct == 0x009a:
             from . import blobs_9a as blobs
         elif usb.usb_dev().idProduct == 0x00b7:
-            from . import blobs_9a as blobs   # HP G6 series; same sensor type as 0x00ab
+            from . import blobs_d51 as blobs  # HP G6 series; d51/969 reset family
         elif usb.usb_dev().idProduct == 0x00cb:
             from . import blobs_00cb as blobs   # HP Pavilion x360 14-dh; 0x969, own reset_blob
 

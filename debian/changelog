@@ -1,3 +1,17 @@
+python-validity (0.16~hp16) noble; urgency=medium
+
+  * Reconstruct the 138a:00ab clean-slate bootstrap from the original Windows
+    USBPcap attached to PR #256. Select the captured d51-family reset payload
+    for 138a:00ab and 06cb:00b7, initialize the ROM transport before flash
+    formatting, and reproduce the observed register/identity/cleanup preflight.
+  * Guard the new provisioning path behind a zero-partition flash probe and
+    the exact d51-family USB IDs; already-provisioned devices remain read-only
+    through this branch.
+  * Verify the proprietary payload by length and SHA-256 and add regression
+    coverage for bootstrap ordering and preflight command order.
+
+ -- Dev Tochukwu <devtochukwu@users.noreply.github.com>  Wed, 05 Aug 2026 08:00:00 +0100
+
 python-validity (0.16~hp15) noble; urgency=medium
 
   * Recognize the complete 04 000100db and 05 000100db no-template packets
