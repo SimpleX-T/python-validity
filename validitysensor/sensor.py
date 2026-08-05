@@ -969,15 +969,18 @@ class Sensor:
 
             b = usb.wait_int()
 
-            # These related chips use different interrupts for a successful
-            # high-quality capture that matched no enrolled template. Keep
-            # this distinct from capture-quality failures so the D-Bus layer
-            # can offer a bounded retry for occasional matcher false negatives.
-            no_match_interrupt = {
-                0xd51: 5,
-                0x969: 4,
-            }.get(getattr(self, 'real_device_type', None))
-            if no_match_interrupt is not None and b[0] == no_match_interrupt:
+            # Both 04 000100db and 05 000100db are clean on-chip no-template
+            # results on this family. Earlier hardware evidence suggested the
+            # leading byte was subtype-specific (4 on 0x969, 5 on 0xd51), but
+            # physical 138a:00ab / 0xd51 firmware also emitted 4 after reboot.
+            # Match the complete observed packet so unrelated interrupt 4/5
+            # failures are not accidentally classified as a false negative.
+            no_template_packets = {
+                b'\x04\x00\x01\x00\xdb',
+                b'\x05\x00\x01\x00\xdb',
+            }
+            if (getattr(self, 'real_device_type', None) in (0xd51, 0x969)
+                    and b in no_template_packets):
                 raise FingerNotMatchedException(
                     'No-template interrupt for sensor 0x%x: %s'
                     % (self.real_device_type, hexlify(b).decode()))

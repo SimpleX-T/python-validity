@@ -1,7 +1,7 @@
 import unittest
 
 from validitysensor.sensor import FingerNotMatchedException
-from validitysensor.verification import identify_with_retries
+from validitysensor.verification import CaptureRetryNotifier, identify_with_retries
 
 
 class VerificationRetryTests(unittest.TestCase):
@@ -49,6 +49,26 @@ class VerificationRetryTests(unittest.TestCase):
                 identify, lambda error: None, lambda *args: None)
 
         self.assertEqual(len(calls), 1)
+
+
+class CaptureRetryNotifierTests(unittest.TestCase):
+    def test_waiting_for_contact_never_self_cancels(self):
+        emitted = []
+        logged = []
+        notify = CaptureRetryNotifier(
+            'alice',
+            lambda result, done: emitted.append((result, done)),
+            lambda message, *args: logged.append((message, args)),
+        )
+
+        # Rejected/blank frames do not distinguish a wedged chip from a user
+        # who has not made adequate contact. The client owns the timeout.
+        for _ in range(100):
+            notify(None)
+
+        self.assertEqual(notify.count, 100)
+        self.assertEqual(emitted, [('verify-retry-scan', False)])
+        self.assertEqual(len(logged), 100)
 
 
 if __name__ == '__main__':

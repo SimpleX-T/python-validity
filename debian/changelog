@@ -1,3 +1,19 @@
+python-validity (0.16~hp15) noble; urgency=medium
+
+  * Recognize the complete 04 000100db and 05 000100db no-template packets
+    on both 0xd51 and 0x969 firmware variants. Physical 138a:00ab / 0xd51
+    hardware emitted interrupt 4 after reboot, disproving the previous strict
+    subtype mapping while preserving exact-packet validation.
+  * Remove the 25-rejected-frame daemon watchdog. Blank frames, poor contact,
+    and a genuinely unresponsive quality gate are indistinguishable at that
+    callback, so the threshold aborted healthy verifies while users were still
+    approaching the reader. D-Bus clients now exclusively own timeout and
+    cancellation; retry prompting remains throttled to one signal.
+  * Add regression coverage for both packet variants, unrelated interrupt
+    rejection, and 100 capture retries without daemon-side cancellation.
+
+ -- Dev Tochukwu <devtochukwu@users.noreply.github.com>  Wed, 05 Aug 2026 07:00:00 +0100
+
 python-validity (0.16~hp14) noble; urgency=medium
 
   * Retry open-fprintd device registration when fprintd appears before the
