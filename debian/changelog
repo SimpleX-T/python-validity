@@ -14,6 +14,11 @@ python-validity (0.16~hp17) noble; urgency=medium
     but do not globally retrigger udev, start the daemon inside dpkg, or modify
     PAM automatically. Matched hardware starts through udev on the next real
     add event (normally the next boot).
+  * Restrict the startup USB-reset recovery to 138a:00ab and 06cb:00b7, the
+    exact device families with observed first-command wedges. Legacy readers
+    and 06cb:00cb retain their established startup behavior.
+  * Replace stale d51/969 reset guidance with the validated per-device
+    provisioned/clean-slate support matrix.
 
  -- Dev Tochukwu <devtochukwu@users.noreply.github.com>  Wed, 05 Aug 2026 12:00:00 +0100
 

@@ -29,7 +29,7 @@ $ sudo apt remove fprintd
 $ sudo add-apt-repository ppa:uunicorn/open-fprintd
 $ sudo apt-get update
 $ sudo apt install open-fprintd fprintd-clients python3-validity
-...wait a bit...
+$ sudo reboot
 $ fprintd-enroll
 ```
 
@@ -61,6 +61,11 @@ If it's not running, you can enable and/or start it by substituting `status` wit
 #### Errors on startup
 
 It `systemctl status python3-validity` complains about errors on startup, you may need to factory-reset the fingerprint chip. Do that like so:
+
+**Do not run this generic factory-reset procedure on `138a:00ab`,
+`06cb:00b7`, or `06cb:00cb`.** These families need device-specific reset
+sequences; use the matrix below.
+
 ```
 $ sudo systemctl stop python3-validity
 $ sudo validity-sensors-firmware
@@ -85,29 +90,28 @@ $ sudo systemctl enable open-fprintd-resume open-fprintd-suspend
 
 For even more error procedures, check [this Arch comment thread](https://aur.archlinux.org/packages/python-validity/#comment-755904) or [this python-validity bug comment thread](https://github.com/uunicorn/python-validity/issues/3).
 
-#### `factory_reset` / `init_flash` fails with `0404`
+#### Clean-slate / `0404` status on d51 and 969 hardware
 
-On 0xd51 and 0x969 silicon (HP EliteBook 840 G5, HP G6 family,
-HP ZBook Studio x360 G5, and likely other 138a:00ab / 06cb:00b7 variants)
-the `reset_blob` we ship — extracted from Windows drivers for older
-0x199-class Prometheus chips — is rejected by the chip with status `0404`.
-This affects two scenarios:
+Support is keyed by exact USB identity and flash state, not inferred from a
+similar sensor type:
 
-- **Factory-fresh chip** (e.g. after a UEFI BIOS reset). `init_flash`
-  cannot format the flash and the daemon crash-loops.
-- **Windows-Hello-paired chip.** After hitting the "Signature verification
-  failed" error, users typically try `playground/factory-reset.py`; on
-  these chips it fails at the very first command with `0404`.
+| USB ID | Provisioned sensor | Zero-partition sensor |
+|---|---|---|
+| `138a:00ab` | Supported | Supported: the captured d51 bootstrap is selected automatically |
+| `06cb:00b7` | Supported | Intentionally refused: a complete family-specific bootstrap capture is still required |
+| `06cb:00cb` | Supported | Uses its own device-specific reset payload |
 
-There is currently **no known Linux-side workaround** — we do not have a
-reset_blob known to work on 0xd51 / 0x969. If you hit this, please add
-your hardware details (`dmidecode -t 1`, `lsusb -v`, and the failing
-journal output) to
-[uunicorn/python-validity#256](https://github.com/uunicorn/python-validity/pull/256)
-so affected models can be tracked. Windows-paired users can, as a
-workaround, boot Windows and reinstall the Synaptics driver (Device
-Manager → uninstall with "delete driver software" → reboot → let Windows
-reinstall) to re-pair the chip on the Windows side.
+The `138a:00ab` bootstrap reproduces the command ordering and 11,973-byte
+reset payload from the Windows factory capture attached to
+[PR #256](https://github.com/uunicorn/python-validity/pull/256). It has been
+independently validated from zero partitions through firmware upload,
+enrollment, and verification. The same write path is deliberately not used
+for `06cb:00b7`: hardware testing proved that accepting a related payload does
+not establish compatibility with the later reset and format commands.
+
+If a zero-partition `06cb:00b7` is refused, preserve that state and attach a
+Windows clean-slate USB capture to PR #256. Do not repeatedly try reset blobs
+from adjacent models.
 
 ## Enabling fingerprint for system authentication
 

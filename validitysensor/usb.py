@@ -32,6 +32,14 @@ class SupportedDevices(Enum):
 supported_devices = dict((dev.value, dev) for dev in SupportedDevices)
 
 
+def requires_startup_usb_reset(dev):
+    """Limit the recovery reset to hardware that has demonstrated the wedge."""
+    return (dev.idVendor, dev.idProduct) in {
+        SupportedDevices.DEV_AB.value,
+        SupportedDevices.DEV_B7.value,
+    }
+
+
 class CancelledException(Exception):
     pass
 
@@ -83,16 +91,18 @@ class Usb:
         # and Maarten (Arch, ZBook G5, USBTimeoutError on first 3e). Also
         # observed locally on the maintainer's machine (sensor prompts but
         # doesn't detect after a while).
-        try:
-            vid, pid = dev.idVendor, dev.idProduct
-            dev.reset()
-            time.sleep(0.5)
-            # USB address may shift after reset; re-find by vid/pid.
-            dev = ucore.find(idVendor=vid, idProduct=pid)
-            if dev is None:
-                raise Exception('Device disappeared after USB reset')
-        except USBError as e:
-            logging.warning('open_dev: USB reset failed (often non-fatal): %s', e)
+        if requires_startup_usb_reset(dev):
+            try:
+                vid, pid = dev.idVendor, dev.idProduct
+                dev.reset()
+                time.sleep(0.5)
+                # USB address may shift after reset; re-find by vid/pid.
+                dev = ucore.find(idVendor=vid, idProduct=pid)
+                if dev is None:
+                    raise Exception('Device disappeared after USB reset')
+            except USBError as e:
+                logging.warning(
+                    'open_dev: USB reset failed (often non-fatal): %s', e)
 
         self.dev = dev
         self.dev.default_timeout = 15000
