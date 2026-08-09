@@ -75,9 +75,19 @@ def prepare_clean_slate_reset():
     call_cleanups()
 
 
-def is_d51_reset_family():
+def has_validated_clean_slate_bootstrap():
     dev = usb.usb_dev()
-    return (dev.idVendor, dev.idProduct) in ((0x138a, 0x00ab), (0x06cb, 0x00b7))
+    # The packet-78 payload and complete command ordering were captured from
+    # 138a:00ab hardware. 06cb:00b7 is related silicon, but physical testing
+    # shows that accepting a blob does not prove the following reset/format
+    # sequence is compatible. Never write an inferred bootstrap to a scarce
+    # zero-partition sensor.
+    return (dev.idVendor, dev.idProduct) == (0x138a, 0x00ab)
+
+
+def is_unvalidated_b7_clean_slate():
+    dev = usb.usb_dev()
+    return (dev.idVendor, dev.idProduct) == (0x06cb, 0x00b7)
 
 
 def with_hdr(id: int, buf: bytes):
@@ -151,8 +161,15 @@ def init_flash():
     else:
         logging.info('Flash was not initialized yet. Formatting...')
 
-    if is_d51_reset_family():
+    if has_validated_clean_slate_bootstrap():
         prepare_clean_slate_reset()
+    elif is_unvalidated_b7_clean_slate():
+        raise Exception(
+            'Refusing to provision zero-partition 06cb:00b7 sensor: '
+            'the complete reset/format sequence has not been validated on '
+            'this hardware. Please attach a Windows clean-slate USB capture '
+            'to uunicorn/python-validity#256.'
+        )
 
     rsp = usb.cmd(reset_blob)
     status, = unpack('<H', rsp[:2])

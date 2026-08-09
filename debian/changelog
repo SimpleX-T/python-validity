@@ -1,3 +1,22 @@
+python-validity (0.16~hp17) noble; urgency=medium
+
+  * Restrict the captured clean-slate write path to 138a:00ab, the exact USB
+    identity from which the payload and command sequence were recovered.
+    New 06cb:00b7 hardware evidence shows that blob acceptance alone does not
+    establish compatibility with the subsequent reset/format commands, so
+    unprovisioned 00b7 sensors remain fail-closed pending their own capture.
+  * Add regression coverage preventing inferred clean-slate writes to related
+    but unvalidated sensor variants.
+  * Log successful and wrong-template match outcomes at INFO level so
+    long-duration stability tests can distinguish real matches from silent
+    client cancellation without exposing biometric or template material.
+  * Keep package installation hardware-safe: cache firmware and reload rules,
+    but do not globally retrigger udev, start the daemon inside dpkg, or modify
+    PAM automatically. Matched hardware starts through udev on the next real
+    add event (normally the next boot).
+
+ -- Dev Tochukwu <devtochukwu@users.noreply.github.com>  Wed, 05 Aug 2026 12:00:00 +0100
+
 python-validity (0.16~hp16) noble; urgency=medium
 
   * Reconstruct the 138a:00ab clean-slate bootstrap from the original Windows

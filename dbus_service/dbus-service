@@ -169,10 +169,16 @@ class Device(dbus.service.Object):
                     max_attempts=max_match_attempts,
                 )
                 if usr.dbid == usrid:
+                    logging.info(
+                        'Fingerprint verification matched enrolled template '
+                        '(user=%s)', user)
                     self.VerifyStatus('verify-match', True)
                 else:
                     # A different user's (or Windows Hello) template really
                     # matched; retrying cannot change template ownership.
+                    logging.info(
+                        'Fingerprint capture matched a different template '
+                        '(requested_user=%s)', user)
                     self.VerifyStatus('verify-no-match', True)
             except FingerNotMatchedException:
                 self.VerifyStatus('verify-no-match', True)
