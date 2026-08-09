@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from .blobs import reset_blob
+from .clean_slate_probe import decode_response
 from .flash import write_flash, erase_flash, call_cleanups, PartitionInfo, get_flash_info, FlashInfo
 from .hw_tables import FlashIcInfo
 from .sensor import (
@@ -75,14 +76,29 @@ def prepare_clean_slate_reset():
     call_cleanups()
 
 
-def has_validated_clean_slate_bootstrap():
-    dev = usb.usb_dev()
-    # The packet-78 payload and complete command ordering were captured from
-    # 138a:00ab hardware. 06cb:00b7 is related silicon, but physical testing
-    # shows that accepting a blob does not prove the following reset/format
-    # sequence is compatible. Never write an inferred bootstrap to a scarce
-    # zero-partition sensor.
-    return (dev.idVendor, dev.idProduct) == (0x138a, 0x00ab)
+def read_clean_slate_identity():
+    """Read the immutable identity fields needed before authorizing writes."""
+    rom = decode_response('rom-info', usb.cmd(b'\x01'))
+    sensor = decode_response('sensor-identity', usb.cmd(b'\x75'))
+    if rom.get('status') != 0 or sensor.get('status') != 0:
+        raise Exception('Could not read clean-slate sensor identity')
+    return rom, sensor
+
+
+def has_validated_clean_slate_bootstrap(dev, rom, sensor):
+    # Packet 78 and its ordering were captured and physically validated only
+    # for this complete identity. VID:PID is insufficient: 138a:00ab has also
+    # been observed with real sensor type 0x969 and a different sensor name.
+    return (
+        (dev.idVendor, dev.idProduct) == (0x138a, 0x00ab)
+        and rom.get('timestamp') == 1415491824
+        and rom.get('build') == 164
+        and rom.get('rom_major') == 6
+        and rom.get('rom_minor') == 7
+        and rom.get('product') == 48
+        and sensor.get('sensor_type') == 0xd51
+        and sensor.get('sensor_name') == '57K0 FM- 154-120'
+    )
 
 
 def is_unvalidated_b7_clean_slate():
@@ -161,7 +177,17 @@ def init_flash():
     else:
         logging.info('Flash was not initialized yet. Formatting...')
 
-    if has_validated_clean_slate_bootstrap():
+    dev = usb.usb_dev()
+    if (dev.idVendor, dev.idProduct) == (0x138a, 0x00ab):
+        rom, sensor_identity = read_clean_slate_identity()
+        if not has_validated_clean_slate_bootstrap(
+                dev, rom, sensor_identity):
+            raise Exception(
+                'Refusing to provision zero-partition 138a:00ab sensor: '
+                'its ROM and sensor identity do not match the validated '
+                'd51 clean-slate capture. Please attach the read-only probe '
+                'output to uunicorn/python-validity#256.'
+            )
         prepare_clean_slate_reset()
     elif is_unvalidated_b7_clean_slate():
         raise Exception(

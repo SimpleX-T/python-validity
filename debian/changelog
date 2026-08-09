@@ -19,6 +19,9 @@ python-validity (0.16~hp17) noble; urgency=medium
     and 06cb:00cb retain their established startup behavior.
   * Replace stale d51/969 reset guidance with the validated per-device
     provisioned/clean-slate support matrix.
+  * Deepen the 138a:00ab clean-slate guard from VID:PID-only to the complete
+    captured ROM and sensor identity. The same USB ID exists with 0x969
+    hardware, so it must never inherit the d51 write sequence by inference.
 
  -- Dev Tochukwu <devtochukwu@users.noreply.github.com>  Wed, 05 Aug 2026 12:00:00 +0100
 

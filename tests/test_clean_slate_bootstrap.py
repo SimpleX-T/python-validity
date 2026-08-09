@@ -1,5 +1,6 @@
 import hashlib
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 
@@ -58,25 +59,94 @@ class CleanSlateBootstrapTests(unittest.TestCase):
             ('cleanup',),
         ])
 
-    def test_only_captured_usb_identity_has_write_bootstrap(self):
+    def test_only_captured_complete_identity_has_write_bootstrap(self):
         from validitysensor import init_flash
 
-        devices = {
-            (0x138a, 0x00ab): True,
-            (0x06cb, 0x00b7): False,
-            (0x06cb, 0x00cb): False,
+        captured_rom = {
+            'timestamp': 1415491824,
+            'build': 164,
+            'rom_major': 6,
+            'rom_minor': 7,
+            'product': 48,
         }
-        for (vendor, product), expected in devices.items():
+        captured_sensor = {
+            'sensor_type': 0xd51,
+            'sensor_name': '57K0 FM- 154-120',
+        }
+        dev = type('UsbDevice', (), {
+            'idVendor': 0x138a,
+            'idProduct': 0x00ab,
+        })()
+
+        self.assertTrue(init_flash.has_validated_clean_slate_bootstrap(
+            dev, captured_rom, captured_sensor))
+
+        variants = (
+            ({**captured_rom, 'build': 165}, captured_sensor),
+            (captured_rom, {**captured_sensor, 'sensor_type': 0x969}),
+            (captured_rom, {
+                **captured_sensor,
+                'sensor_name': '57K0 FM- 154-123',
+            }),
+        )
+        for rom, sensor in variants:
+            with self.subTest(rom=rom, sensor=sensor):
+                self.assertFalse(
+                    init_flash.has_validated_clean_slate_bootstrap(
+                        dev, rom, sensor))
+
+    def test_adjacent_usb_ids_cannot_use_captured_bootstrap(self):
+        from validitysensor import init_flash
+
+        rom = {
+            'timestamp': 1415491824,
+            'build': 164,
+            'rom_major': 6,
+            'rom_minor': 7,
+            'product': 48,
+        }
+        sensor = {
+            'sensor_type': 0xd51,
+            'sensor_name': '57K0 FM- 154-120',
+        }
+        for vendor, product in ((0x06cb, 0x00b7), (0x06cb, 0x00cb)):
             dev = type('UsbDevice', (), {
                 'idVendor': vendor,
                 'idProduct': product,
             })()
-            with self.subTest(vendor=vendor, product=product), \
-                    patch.object(init_flash.usb, 'usb_dev', return_value=dev):
-                self.assertEqual(
-                    init_flash.has_validated_clean_slate_bootstrap(),
-                    expected,
-                )
+            with self.subTest(vendor=vendor, product=product):
+                self.assertFalse(
+                    init_flash.has_validated_clean_slate_bootstrap(
+                        dev, rom, sensor))
+
+    def test_mismatched_ab_identity_is_refused_before_any_reset_write(self):
+        from validitysensor import init_flash
+
+        dev = SimpleNamespace(idVendor=0x138a, idProduct=0x00ab)
+        rom = {
+            'timestamp': 1415491824,
+            'build': 164,
+            'rom_major': 6,
+            'rom_minor': 7,
+            'product': 48,
+        }
+        unvalidated_sensor = {
+            'sensor_type': 0x969,
+            'sensor_name': '57K0 FM- 154-123',
+        }
+        with patch.object(
+                init_flash, 'get_flash_info',
+                return_value=SimpleNamespace(partitions=[])), \
+                patch.object(init_flash.usb, 'usb_dev', return_value=dev), \
+                patch.object(
+                    init_flash, 'read_clean_slate_identity',
+                    return_value=(rom, unvalidated_sensor)), \
+                patch.object(init_flash, 'reset_blob') as reset:
+            with self.assertRaisesRegex(
+                    Exception, 'ROM and sensor identity do not match'):
+                init_flash.init_flash()
+
+        reset.assert_not_called()
 
     def test_b7_zero_partition_sensor_is_identified_as_unvalidated(self):
         from validitysensor import init_flash

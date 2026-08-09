@@ -97,15 +97,17 @@ similar sensor type:
 
 | USB ID | Provisioned sensor | Zero-partition sensor |
 |---|---|---|
-| `138a:00ab` | Supported | Supported: the captured d51 bootstrap is selected automatically |
+| `138a:00ab` | Supported | Supported only when the full ROM and sensor identity matches the captured `0xd51` / `57K0 FM- 154-120` fixture |
 | `06cb:00b7` | Supported | Intentionally refused: a complete family-specific bootstrap capture is still required |
 | `06cb:00cb` | Supported | Uses its own device-specific reset payload |
 
-The `138a:00ab` bootstrap reproduces the command ordering and 11,973-byte
+The validated `138a:00ab` bootstrap reproduces the command ordering and 11,973-byte
 reset payload from the Windows factory capture attached to
 [PR #256](https://github.com/uunicorn/python-validity/pull/256). It has been
 independently validated from zero partitions through firmware upload,
-enrollment, and verification. The same write path is deliberately not used
+enrollment, and verification. Because the same USB ID can expose different
+real sensor types, the write gate also checks the captured ROM version, build,
+product, sensor type, and sensor name. The same write path is deliberately not used
 for `06cb:00b7`: hardware testing proved that accepting a related payload does
 not establish compatibility with the later reset and format commands.
 
