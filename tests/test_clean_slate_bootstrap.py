@@ -69,17 +69,29 @@ class CleanSlateBootstrapTests(unittest.TestCase):
             'rom_minor': 7,
             'product': 48,
         }
-        captured_sensor = {
-            'sensor_type': 0xd51,
-            'sensor_name': '57K0 FM- 154-120',
-        }
+        for vendor, product, name in (
+                (0x138a, 0x00ab, '57K0 FM- 154-120'),
+                (0x06cb, 0x00b7, '57K0 FM-3439-001')):
+            dev = type('UsbDevice', (), {
+                'idVendor': vendor,
+                'idProduct': product,
+            })()
+            captured_sensor = {
+                'sensor_type': 0xd51,
+                'sensor_name': name,
+            }
+            with self.subTest(vendor=vendor, product=product, name=name):
+                self.assertTrue(init_flash.has_validated_clean_slate_bootstrap(
+                    dev, captured_rom, captured_sensor))
+
         dev = type('UsbDevice', (), {
             'idVendor': 0x138a,
             'idProduct': 0x00ab,
         })()
-
-        self.assertTrue(init_flash.has_validated_clean_slate_bootstrap(
-            dev, captured_rom, captured_sensor))
+        captured_sensor = {
+            'sensor_type': 0xd51,
+            'sensor_name': '57K0 FM- 154-120',
+        }
 
         variants = (
             ({**captured_rom, 'build': 165}, captured_sensor),
@@ -109,7 +121,7 @@ class CleanSlateBootstrapTests(unittest.TestCase):
             'sensor_type': 0xd51,
             'sensor_name': '57K0 FM- 154-120',
         }
-        for vendor, product in ((0x06cb, 0x00b7), (0x06cb, 0x00cb)):
+        for vendor, product in ((0x06cb, 0x00cb),):
             dev = type('UsbDevice', (), {
                 'idVendor': vendor,
                 'idProduct': product,
@@ -148,15 +160,57 @@ class CleanSlateBootstrapTests(unittest.TestCase):
 
         reset.assert_not_called()
 
-    def test_b7_zero_partition_sensor_is_identified_as_unvalidated(self):
+    def test_validated_b7_uses_its_observed_direct_reset_ordering(self):
+        from validitysensor import init_flash
+
+        dev = SimpleNamespace(idVendor=0x06cb, idProduct=0x00b7)
+        rom = {
+            'timestamp': 1415491824,
+            'build': 164,
+            'rom_major': 6,
+            'rom_minor': 7,
+            'product': 48,
+        }
+        sensor = {
+            'sensor_type': 0xd51,
+            'sensor_name': '57K0 FM-3439-001',
+        }
+        with patch.object(
+                init_flash, 'get_flash_info',
+                return_value=SimpleNamespace(partitions=[])), \
+                patch.object(init_flash.usb, 'usb_dev', return_value=dev), \
+                patch.object(
+                    init_flash, 'read_clean_slate_identity',
+                    return_value=(rom, sensor)), \
+                patch.object(init_flash, 'prepare_clean_slate_reset') as preflight, \
+                patch.object(
+                    init_flash.usb, 'cmd',
+                    side_effect=RuntimeError('reset reached')):
+            with self.assertRaisesRegex(RuntimeError, 'reset reached'):
+                init_flash.init_flash()
+
+        preflight.assert_not_called()
+
+    def test_b7_969_identity_cannot_use_d51_bootstrap(self):
         from validitysensor import init_flash
 
         dev = type('UsbDevice', (), {
             'idVendor': 0x06cb,
             'idProduct': 0x00b7,
         })()
-        with patch.object(init_flash.usb, 'usb_dev', return_value=dev):
-            self.assertTrue(init_flash.is_unvalidated_b7_clean_slate())
+        rom = {
+            'timestamp': 1415491824,
+            'build': 164,
+            'rom_major': 6,
+            'rom_minor': 7,
+            'product': 48,
+        }
+        sensor = {
+            'sensor_type': 0x969,
+            'sensor_name': '57K0 FM-3439-002',
+        }
+        self.assertFalse(init_flash.has_validated_clean_slate_bootstrap(
+            dev, rom, sensor))
 
 
 if __name__ == '__main__':

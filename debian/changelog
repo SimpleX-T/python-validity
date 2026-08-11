@@ -1,10 +1,9 @@
-python-validity (0.16~hp17) noble; urgency=medium
+python-validity (0.16~hp18) noble; urgency=medium
 
-  * Restrict the captured clean-slate write path to 138a:00ab, the exact USB
-    identity from which the payload and command sequence were recovered.
-    New 06cb:00b7 hardware evidence shows that blob acceptance alone does not
-    establish compatibility with the subsequent reset/format commands, so
-    unprovisioned 00b7 sensors remain fail-closed pending their own capture.
+  * Allow the captured d51 clean-slate sequence for the second independently
+    reproduced zero-partition identity: 06cb:00b7 / 0xd51 / FM-3439-001.
+    Keep every other 00b7 variant fail-closed; that USB ID also contains 0x969
+    devices whose reset/format sequence remains unproven.
   * Add regression coverage preventing inferred clean-slate writes to related
     but unvalidated sensor variants.
   * Log successful and wrong-template match outcomes at INFO level so
@@ -22,6 +21,9 @@ python-validity (0.16~hp17) noble; urgency=medium
   * Deepen the 138a:00ab clean-slate guard from VID:PID-only to the complete
     captured ROM and sensor identity. The same USB ID exists with 0x969
     hardware, so it must never inherit the d51 write sequence by inference.
+  * Recover only the documented interrupted-fwext state: if partition 2
+    returns signature error 044f, erase that incomplete firmware partition and
+    re-upload it. Leave every other firmware probe error non-destructive.
 
  -- Dev Tochukwu <devtochukwu@users.noreply.github.com>  Wed, 05 Aug 2026 12:00:00 +0100
 

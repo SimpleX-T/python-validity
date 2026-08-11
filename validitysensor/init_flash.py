@@ -85,25 +85,36 @@ def read_clean_slate_identity():
     return rom, sensor
 
 
+_D51_BOOT_ROM = {
+    'timestamp': 1415491824,
+    'build': 164,
+    'rom_major': 6,
+    'rom_minor': 7,
+    'product': 48,
+}
+
+_VALIDATED_CLEAN_SLATE_IDENTITIES = (
+    # The original Windows USB capture, reproduced from zero partitions by
+    # pianist at PR head 62ee97f.
+    (0x138a, 0x00ab, '57K0 FM- 154-120'),
+    # Independently reproduced from factory-empty flash by gfiguero using
+    # the same HP DLL payload and current PR initialization sequence.
+    (0x06cb, 0x00b7, '57K0 FM-3439-001'),
+)
+
+
 def has_validated_clean_slate_bootstrap(dev, rom, sensor):
-    # Packet 78 and its ordering were captured and physically validated only
-    # for this complete identity. VID:PID is insufficient: 138a:00ab has also
-    # been observed with real sensor type 0x969 and a different sensor name.
+    """Authorize the destructive bootstrap only for physical evidence rows."""
+    # VID:PID alone is insufficient: both USB IDs have also been observed
+    # with 0x969 silicon.  Keep each destructive sequence keyed to the ROM
+    # family, real type, and model string that completed an artifact-backed
+    # zero-partition run.
     return (
-        (dev.idVendor, dev.idProduct) == (0x138a, 0x00ab)
-        and rom.get('timestamp') == 1415491824
-        and rom.get('build') == 164
-        and rom.get('rom_major') == 6
-        and rom.get('rom_minor') == 7
-        and rom.get('product') == 48
+        all(rom.get(key) == value for key, value in _D51_BOOT_ROM.items())
         and sensor.get('sensor_type') == 0xd51
-        and sensor.get('sensor_name') == '57K0 FM- 154-120'
+        and (dev.idVendor, dev.idProduct, sensor.get('sensor_name'))
+        in _VALIDATED_CLEAN_SLATE_IDENTITIES
     )
-
-
-def is_unvalidated_b7_clean_slate():
-    dev = usb.usb_dev()
-    return (dev.idVendor, dev.idProduct) == (0x06cb, 0x00b7)
 
 
 def with_hdr(id: int, buf: bytes):
@@ -178,24 +189,18 @@ def init_flash():
         logging.info('Flash was not initialized yet. Formatting...')
 
     dev = usb.usb_dev()
-    if (dev.idVendor, dev.idProduct) == (0x138a, 0x00ab):
+    if (dev.idVendor, dev.idProduct) in ((0x138a, 0x00ab), (0x06cb, 0x00b7)):
         rom, sensor_identity = read_clean_slate_identity()
         if not has_validated_clean_slate_bootstrap(
                 dev, rom, sensor_identity):
             raise Exception(
-                'Refusing to provision zero-partition 138a:00ab sensor: '
+                'Refusing to provision zero-partition d51-family sensor: '
                 'its ROM and sensor identity do not match the validated '
-                'd51 clean-slate capture. Please attach the read-only probe '
+                'clean-slate evidence. Please attach the read-only probe '
                 'output to uunicorn/python-validity#256.'
             )
-        prepare_clean_slate_reset()
-    elif is_unvalidated_b7_clean_slate():
-        raise Exception(
-            'Refusing to provision zero-partition 06cb:00b7 sensor: '
-            'the complete reset/format sequence has not been validated on '
-            'this hardware. Please attach a Windows clean-slate USB capture '
-            'to uunicorn/python-validity#256.'
-        )
+        if (dev.idVendor, dev.idProduct) == (0x138a, 0x00ab):
+            prepare_clean_slate_reset()
 
     rsp = usb.cmd(reset_blob)
     status, = unpack('<H', rsp[:2])

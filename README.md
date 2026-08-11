@@ -98,22 +98,21 @@ similar sensor type:
 | USB ID | Provisioned sensor | Zero-partition sensor |
 |---|---|---|
 | `138a:00ab` | Supported | Supported only when the full ROM and sensor identity matches the captured `0xd51` / `57K0 FM- 154-120` fixture |
-| `06cb:00b7` | Supported | Intentionally refused: a complete family-specific bootstrap capture is still required |
+| `06cb:00b7` | Supported | Supported only for the observed `0xd51` / `57K0 FM-3439-001` identity with the d51 boot ROM |
 | `06cb:00cb` | Supported | Uses its own device-specific reset payload |
 
-The validated `138a:00ab` bootstrap reproduces the command ordering and 11,973-byte
+The validated d51 bootstrap reproduces the command ordering and 11,973-byte
 reset payload from the Windows factory capture attached to
 [PR #256](https://github.com/uunicorn/python-validity/pull/256). It has been
-independently validated from zero partitions through firmware upload,
-enrollment, and verification. Because the same USB ID can expose different
-real sensor types, the write gate also checks the captured ROM version, build,
-product, sensor type, and sensor name. The same write path is deliberately not used
-for `06cb:00b7`: hardware testing proved that accepting a related payload does
-not establish compatibility with the later reset and format commands.
-
-If a zero-partition `06cb:00b7` is refused, preserve that state and attach a
-Windows clean-slate USB capture to PR #256. Do not repeatedly try reset blobs
-from adjacent models.
+validated from zero partitions through firmware upload, enrollment, and
+verification on `138a:00ab / 0xd51 / 57K0 FM- 154-120`. An independent
+factory-empty `06cb:00b7 / 0xd51 / 57K0 FM-3439-001` report confirms the same
+HP payload creates the five-partition layout through the device's original
+direct-reset ordering. Because both USB IDs also occur with different real sensor types, the
+write gate checks the boot ROM, real type, and sensor name before sending the
+destructive reset packet. Any other zero-partition model remains refused: keep
+that state intact and attach its read-only probe plus a Windows capture to PR
+#256 rather than trying payloads from adjacent models.
 
 ## Enabling fingerprint for system authentication
 
