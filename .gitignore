@@ -8,6 +8,8 @@ debian/tmp/
 
 *.bin
 *.log
+backups/
+firmware/*.xpfwext
 .idea/*
 .pybuild/
 __pycache__

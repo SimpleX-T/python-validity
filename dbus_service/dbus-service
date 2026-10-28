@@ -18,14 +18,11 @@ import dbus.mainloop.glib
 import dbus.service
 import yaml
 from gi.repository import GLib
-try:
-    from gi.repository import GLibUnix
-except ImportError:  # PyGObject versions before the split namespace
-    GLibUnix = None
 from usb import core as usb_core
 
 from validitysensor import init
 from validitysensor.db import subtype_to_string, db, SidIdentity, User
+from validitysensor.glib_compat import unix_signal_add
 from validitysensor.init_data_dir import PYTHON_VALIDITY_DATA_DIR, init_data_dir
 from validitysensor.operation import OperationBusy, OperationController
 from validitysensor.registration import RetryingRegistrar
@@ -366,7 +363,9 @@ def main():
         logging.info('Caught signal %d. Stopping...' % x)
         loop.quit()
 
-    signal_add = GLibUnix.signal_add if GLibUnix else GLib.unix_signal_add
+    # g_unix_signal_add moved between GLib and GLibUnix across PyGObject
+    # releases; the helper picks whichever binding this build provides.
+    signal_add = unix_signal_add()
     signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, die, signal.SIGINT)
     signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, die, signal.SIGTERM)
     try:

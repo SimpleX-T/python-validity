@@ -20,6 +20,13 @@ def __load_blob(blob: str) -> bytes:
             from . import blobs_9a as blobs
         elif usb.usb_dev().idProduct == 0x00cb:
             from . import blobs_00cb as blobs   # HP Pavilion x360 14-dh; 0x969, own reset_blob
+        elif usb.usb_dev().idProduct == 0x00bb:
+            # HP Spectre x360 13-ap0xxx: same 0x969 silicon (hw id 0x88,
+            # "57K0 FM-3439-004", W25Q80B) as 06cb:00cb.  Verified on hardware:
+            # init_hardcoded is byte-identical to our Windows capture, and the
+            # 11973-byte 0x969 reset_blob (== blobs_d51) is accepted and wipes
+            # the flash.  See uunicorn/python-validity#283.
+            from . import blobs_00cb as blobs
 
     globals()[blob] = getattr(blobs, blob)
     return globals()[blob]

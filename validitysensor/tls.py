@@ -109,8 +109,16 @@ class Tls:
 
     # Info about the host computer
     def set_hwkey(self, product_name: str, serial_number: str):
-        hw_key = bytes(product_name, 'ascii') + b'\0' + \
-                 bytes(serial_number, 'ascii') + b'\0'
+        # An existing pairing (e.g. created by Windows Hello) may be bound to
+        # a host key that is not the DMI default.  tools/hwkey_probe.py can
+        # recover it from the cert-store backup; pass the raw bytes hex
+        # encoded to reuse that pairing without re-provisioning.
+        override = os.environ.get('PYTHON_VALIDITY_HW_KEY')
+        if override:
+            hw_key = unhexlify(override.strip())
+        else:
+            hw_key = bytes(product_name, 'ascii') + b'\0' + \
+                     bytes(serial_number, 'ascii') + b'\0'
 
         # pre-TLS keys
         self.psk_encryption_key = prf(password_hardcoded, b'GWK' + hw_key, 0x20)

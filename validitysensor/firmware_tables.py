@@ -37,6 +37,17 @@ FIRMWARE_URIS = {
         'driver': 'https://ftp.hp.com/pub/softpaq/sp138001-138500/sp138431.exe',
         'referral': 'https://support.hp.com/us-en/drivers',
         'sha512': 'b9a268773ac948a4b6bfaa7a5762c58ab482aa47ea321a429ebc8dba3fcdd17ffe750d189791d8e0325b21e95161db5f751c61d7714d7460ee0a406055060a8f'
+    },
+    # HP Spectre x360 13-ap0xxx (06cb:00bb) ships the same 0x969 silicon as
+    # 06cb:00cb and the same xpfwext payload name.  Joentja provisioned the
+    # exact 00bb machine with "6_07f_hp_mis_qm.xpfwext" from HP SoftPaq
+    # SP106161; this SP138431 archive carries the same file.  If the sensor
+    # rejects the signature with 044f, override with
+    #   sudo validity-sensors-firmware --driver-uri file:///path/to/softpaq.exe
+    SupportedDevices.DEV_BB: {
+        'driver': 'https://ftp.hp.com/pub/softpaq/sp138001-138500/sp138431.exe',
+        'referral': 'https://support.hp.com/us-en/drivers',
+        'sha512': 'b9a268773ac948a4b6bfaa7a5762c58ab482aa47ea321a429ebc8dba3fcdd17ffe750d189791d8e0325b21e95161db5f751c61d7714d7460ee0a406055060a8f'
     }
 }
 
@@ -51,4 +62,5 @@ FIRMWARE_NAMES = {
     SupportedDevices.DEV_AB: '6_07f_hp_cmit_mis_qm.xpfwext',  # HP EliteBook 840 G5
     SupportedDevices.DEV_B7: '6_07f_hp_cmit_mis_qm.xpfwext',  # HP G6 series (same chip family)
     SupportedDevices.DEV_CB: '6_07f_hp_mis_qm.xpfwext',  # HP Pavilion x360 14-dh (0x969)
+    SupportedDevices.DEV_BB: '6_07f_hp_mis_qm.xpfwext',  # HP Spectre x360 13-ap0xxx (0x969)
 }
