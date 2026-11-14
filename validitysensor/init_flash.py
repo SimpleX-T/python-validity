@@ -202,7 +202,11 @@ def init_flash():
         if (dev.idVendor, dev.idProduct) == (0x138a, 0x00ab):
             prepare_clean_slate_reset()
 
-    rsp = usb.cmd(reset_blob)
+    if (dev.idVendor, dev.idProduct) == (0x06cb, 0x00b7):
+        from . import blobs_00cb
+        rsp = usb.cmd(blobs_00cb.reset_blob)
+    else:
+        rsp = usb.cmd(reset_blob)
     status, = unpack('<H', rsp[:2])
     assert_status(rsp)
 
